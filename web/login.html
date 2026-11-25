@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QuackUI</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='40' y2='40' gradientUnits='userSpaceOnUse'%3E%3Cstop stop-color='%23fbbf24'/%3E%3Cstop offset='1' stop-color='%2338bdf8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='40' height='40' rx='12' fill='url(%23g)'/%3E%3Cpath d='M12 24c0-5 3.5-8 8.5-8 2.6 0 4.5-1.4 4.5-3.3 0-1.6-1.3-2.7-3-2.7-1.6 0-2.8 1-3 2.5h-3.6c.3-3.4 3-5.8 6.7-5.8 3.9 0 6.7 2.5 6.7 5.8 0 1.4-.5 2.6-1.3 3.5l3.2 1.1-2.8 2.2c.2.8.3 1.7.3 2.7 0 5.3-4.1 9-10 9-5.2 0-6.2-3.4-6.2-7z' fill='%23090d16'/%3E%3Ccircle cx='24' cy='13.2' r='1.3' fill='%23fbbf24'/%3E%3C/svg%3E">
+<style>
+  :root{--bg:#090d16;--card:#111827;--border:rgba(148,163,184,.16);--text:#f8fafc;--muted:#94a3b8;--accent:#f59e0b;--err:#f87171}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
+    background:radial-gradient(800px circle at 20% 15%, rgba(245,158,11,.12), transparent 55%),
+               radial-gradient(700px circle at 85% 85%, rgba(56,189,248,.10), transparent 55%), var(--bg);
+    color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+  .box{width:100%;max-width:380px;background:rgba(17,24,39,.88);backdrop-filter:blur(16px);
+    border:1px solid var(--border);border-radius:20px;padding:34px 30px;box-shadow:0 24px 60px rgba(0,0,0,.45)}
+  .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+  .logo{display:flex;align-items:center;gap:12px}
+  .logo svg{width:38px;height:38px}
+  .logo-title{font-size:24px;font-weight:700;letter-spacing:-.5px;background:linear-gradient(135deg,#fbbf24,#38bdf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .lang-btn{background:rgba(15,23,42,.8);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:8px;font-size:12px;cursor:pointer}
+  .sub{margin:0 0 24px;color:var(--muted);font-size:13px}
+  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:rgba(15,23,42,.9);color:var(--text);font-size:14px;margin-bottom:16px;outline:none;transition:.15s}
+  input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(245,158,11,.15)}
+  button.submit{width:100%;padding:12px;border:none;border-radius:12px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#090d16;font-size:14px;font-weight:700;cursor:pointer;transition:.15s}
+  button.submit:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  .err{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3);color:var(--err);font-size:13px;padding:9px 12px;border-radius:10px;margin-bottom:14px}
+  .foot{margin-top:20px;text-align:center;font-size:12px;color:#64748b}
+</style>
+</head>
+<body>
+<form class="box" method="POST" action="/login">
+  <div class="top">
+    <div class="logo">
+      <svg viewBox="0 0 40 40" fill="none">
+        <rect width="40" height="40" rx="12" fill="url(#g1)"/>
+        <path d="M12 24c0-5 3.5-8 8.5-8 2.6 0 4.5-1.4 4.5-3.3 0-1.6-1.3-2.7-3-2.7-1.6 0-2.8 1-3 2.5h-3.6c.3-3.4 3-5.8 6.7-5.8 3.9 0 6.7 2.5 6.7 5.8 0 1.4-.5 2.6-1.3 3.5l3.2 1.1-2.8 2.2c.2.8.3 1.7.3 2.7 0 5.3-4.1 9-10 9-5.2 0-6.2-3.4-6.2-7z" fill="#090d16"/>
+        <circle cx="24" cy="13.2" r="1.3" fill="#fbbf24"/>
+        <defs><linearGradient id="g1" x1="0" y1="0" x2="40" y2="40"><stop stop-color="#fbbf24"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
+      </svg>
+      <div class="logo-title">QuackUI</div>
+    </div>
+    <button type="button" class="lang-btn" id="lbtn" onclick="toggleLang()">EN</button>
+  </div>
+  <p class="sub" id="t-sub">by FanDuck · 本地安全隧道管理面板</p>
+  __ERR__
+  <label for="pw" id="t-lbl">面板密码</label>
+  <input id="pw" type="password" name="password" placeholder="请输入登录密码" required autofocus>
+  <button type="submit" class="submit" id="t-btn">进入控制台</button>
+  <div class="foot">Local-First · Zero Third-Party Dependencies</div>
+</form>
+<script>
+const L = {
+  zh: { sub:'by FanDuck · 本地安全隧道管理面板', lbl:'面板密码', ph:'请输入登录密码', btn:'进入控制台', sw:'EN' },
+  en: { sub:'by FanDuck · Local-First Xray Panel', lbl:'Panel Password', ph:'Enter password', btn:'Sign In', sw:'中' }
+};
+function applyLang(lang){
+  const t = L[lang] || L.zh;
+  document.getElementById('t-sub').textContent = t.sub;
+  document.getElementById('t-lbl').textContent = t.lbl;
+  document.getElementById('pw').placeholder = t.ph;
+  document.getElementById('t-btn').textContent = t.btn;
+  document.getElementById('lbtn').textContent = t.sw;
+}
+function toggleLang(){
+  const cur = (localStorage.getItem('quackui_lang') || 'zh') === 'zh' ? 'en' : 'zh';
+  localStorage.setItem('quackui_lang', cur); applyLang(cur);
+}
+applyLang(localStorage.getItem('quackui_lang') || 'zh');
+</script>
+</body></html>

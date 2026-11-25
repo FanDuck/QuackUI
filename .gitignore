@@ -1,0 +1,6 @@
+config.json
+quackui.db
+quackui.db-*
+__pycache__/
+*.pyc
+*.tmp

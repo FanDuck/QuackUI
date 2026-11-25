@@ -1,0 +1,680 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QuackUI</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='40' y2='40' gradientUnits='userSpaceOnUse'%3E%3Cstop stop-color='%23fbbf24'/%3E%3Cstop offset='1' stop-color='%2338bdf8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='40' height='40' rx='12' fill='url(%23g)'/%3E%3Cpath d='M12 24c0-5 3.5-8 8.5-8 2.6 0 4.5-1.4 4.5-3.3 0-1.6-1.3-2.7-3-2.7-1.6 0-2.8 1-3 2.5h-3.6c.3-3.4 3-5.8 6.7-5.8 3.9 0 6.7 2.5 6.7 5.8 0 1.4-.5 2.6-1.3 3.5l3.2 1.1-2.8 2.2c.2.8.3 1.7.3 2.7 0 5.3-4.1 9-10 9-5.2 0-6.2-3.4-6.2-7z' fill='%23090d16'/%3E%3Ccircle cx='24' cy='13.2' r='1.3' fill='%23fbbf24'/%3E%3C/svg%3E">
+<style>
+  :root{
+    --bg:#090d16;--bg2:#0f172a;--card:#111827;--card2:#0c1322;
+    --border:rgba(148,163,184,.14);--text:#f1f5f9;--muted:#94a3b8;
+    --accent:#f59e0b;--accent2:#38bdf8;--ok:#10b981;--warn:#f59e0b;--err:#ef4444;
+    --shadow:0 10px 30px rgba(0,0,0,.28);
+  }
+  [data-theme="light"]{
+    --bg:#f1f5f9;--bg2:#e2e8f0;--card:#ffffff;--card2:#f8fafc;
+    --border:rgba(15,23,42,.10);--text:#0f172a;--muted:#64748b;
+    --accent:#d97706;--accent2:#0284c7;--ok:#059669;--warn:#d97706;--err:#dc2626;
+    --shadow:0 6px 20px rgba(15,23,42,.06);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.5;min-height:100vh}
+  .layout{display:flex;min-height:100vh}
+  .sidebar{width:230px;background:var(--card);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
+  .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px;border-bottom:1px solid var(--border);margin-bottom:14px}
+  .brand svg{width:32px;height:32px}
+  .brand-name{font-size:19px;font-weight:700;letter-spacing:-.4px;background:linear-gradient(135deg,#fbbf24,#38bdf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .brand-sub{font-size:11px;color:var(--muted)}
+  .nav{display:flex;flex-direction:column;gap:4px;flex:1}
+  .nav button{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:none;border-radius:10px;background:transparent;color:var(--muted);font-size:13.5px;font-weight:500;cursor:pointer;text-align:left;transition:.15s}
+  .nav button:hover{background:var(--card2);color:var(--text)}
+  .nav button.active{background:rgba(245,158,11,.14);color:var(--accent);font-weight:600}
+  .side-foot{border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)}
+  .main{flex:1;padding:24px 28px 56px;max-width:1200px;width:100%;margin:0 auto}
+  .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:22px}
+  .pills{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:999px;background:var(--card);border:1px solid var(--border);color:var(--muted)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  .dot.bad{background:var(--err);box-shadow:0 0 8px var(--err)}
+  .tab-pane{display:none}.tab-pane.active{display:block}
+  .grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:16px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 20px;box-shadow:var(--shadow);margin-bottom:16px}
+  .grid4 .card,.grid2 .card{margin-bottom:0}
+  .card-title{margin:0 0 14px;font-size:14.5px;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .k{font-size:12px;color:var(--muted);margin-bottom:6px}
+  .v{font-size:22px;font-weight:700;letter-spacing:-.4px}
+  .sub{font-size:12px;color:var(--muted);margin-top:4px}
+  .bar{height:6px;background:var(--bg2);border-radius:999px;overflow:hidden;margin-top:9px}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .35s}
+  .node-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 20px;margin-bottom:14px;box-shadow:var(--shadow)}
+  .node-card.off{opacity:.62}
+  .node-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+  .node-tags{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .tag{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--card2);border:1px solid var(--border);color:var(--muted)}
+  .tag.ok{background:rgba(16,185,129,.14);border-color:rgba(16,185,129,.35);color:var(--ok)}
+  .tag.accent{background:rgba(56,189,248,.14);border-color:rgba(56,189,248,.35);color:var(--accent2)}
+  .kv{display:grid;grid-template-columns:105px 1fr;gap:8px 12px;font-size:13px;align-items:center}
+  .kv .lbl{color:var(--muted)}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-all;background:var(--card2);padding:5px 9px;border-radius:8px;border:1px solid var(--border);font-size:12px;cursor:pointer}
+  .mono:hover{border-color:var(--accent)}
+  .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  button.btn,a.btn{padding:7px 13px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:12.5px;font-weight:500;cursor:pointer;transition:.15s;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
+  button.btn:hover,a.btn:hover{border-color:var(--accent2)}
+  button.primary{background:linear-gradient(135deg,#f59e0b,#d97706);border-color:transparent;color:#090d16;font-weight:700}
+  button.info{background:rgba(56,189,248,.14);border-color:rgba(56,189,248,.35);color:var(--accent2)}
+  button.warn{background:rgba(245,158,11,.14);border-color:rgba(245,158,11,.35);color:var(--accent)}
+  button.danger{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.35);color:var(--err)}
+  .row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
+  .row input,.row select{flex:1;min-width:160px;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:13px;outline:none}
+  .row input:focus,.row select:focus{border-color:var(--accent)}
+  .switch-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+  .switch-row:last-child{border-bottom:none}
+  .switch{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0}
+  .switch input{opacity:0;width:0;height:0}
+  .slider{position:absolute;inset:0;background:var(--bg2);border:1px solid var(--border);border-radius:999px;cursor:pointer;transition:.2s}
+  .slider:before{content:"";position:absolute;height:18px;width:18px;left:2px;bottom:2px;background:#fff;border-radius:50%;transition:.2s}
+  input:checked+.slider{background:var(--accent);border-color:var(--accent)}
+  input:checked+.slider:before{transform:translateX(20px)}
+  .log-tabs{display:flex;gap:8px;flex-wrap:wrap}
+  .log-tabs button.active{background:rgba(56,189,248,.15);border-color:var(--accent2);color:var(--accent2)}
+  pre{margin:0;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:12px;color:var(--muted);max-height:420px;overflow:auto;white-space:pre-wrap;word-break:break-all;font-family:ui-monospace,Consolas,monospace}
+  canvas.chart{width:100%;height:175px;display:block}
+  .check-res{margin-top:12px;padding:10px 14px;border-radius:10px;background:var(--card2);border:1px solid var(--border);font-size:13px;display:none}
+  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.62);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:16px;z-index:80}
+  .modal-bg.open{display:flex}
+  .modal{width:100%;max-width:460px;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+  .modal h3{margin:0 0 14px;font-size:16px;display:flex;justify-content:space-between;align-items:center}
+  .qr-box{background:#fff;padding:16px;border-radius:14px;display:flex;justify-content:center;max-width:230px;margin:10px auto}
+  .qr-box svg{width:196px;height:196px;display:block}
+  .toast{position:fixed;right:22px;bottom:22px;background:var(--card);border:1px solid var(--accent);color:var(--text);padding:11px 16px;border-radius:12px;font-size:13px;display:none;z-index:99;box-shadow:0 12px 32px rgba(0,0,0,.35)}
+  @media(max-width:880px){
+    .layout{flex-direction:column}
+    .sidebar{width:100%;height:auto;position:static;border-right:none;border-bottom:1px solid var(--border);padding:14px}
+    .nav{flex-direction:row;overflow-x:auto}.nav button{white-space:nowrap}
+    .side-foot{display:none}
+    .main{padding:16px}
+    .grid2{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar">
+    <div class="brand">
+      <svg viewBox="0 0 40 40" fill="none">
+        <rect width="40" height="40" rx="12" fill="url(#g2)"/>
+        <path d="M12 24c0-5 3.5-8 8.5-8 2.6 0 4.5-1.4 4.5-3.3 0-1.6-1.3-2.7-3-2.7-1.6 0-2.8 1-3 2.5h-3.6c.3-3.4 3-5.8 6.7-5.8 3.9 0 6.7 2.5 6.7 5.8 0 1.4-.5 2.6-1.3 3.5l3.2 1.1-2.8 2.2c.2.8.3 1.7.3 2.7 0 5.3-4.1 9-10 9-5.2 0-6.2-3.4-6.2-7z" fill="#090d16"/>
+        <circle cx="24" cy="13.2" r="1.3" fill="#fbbf24"/>
+        <defs><linearGradient id="g2" x1="0" y1="0" x2="40" y2="40"><stop stop-color="#fbbf24"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
+      </svg>
+      <div>
+        <div class="brand-name">QuackUI</div>
+        <div class="brand-sub">by FanDuck · v<span id="ver">2.0.0</span></div>
+      </div>
+    </div>
+    <nav class="nav">
+      <button class="active" onclick="switchTab('dash',this)" data-i18n="nav_dash">📊 仪表盘</button>
+      <button onclick="switchTab('nodes',this)" data-i18n="nav_nodes">🚀 节点管理</button>
+      <button onclick="switchTab('routing',this)" data-i18n="nav_routing">🧭 路由与出站</button>
+      <button onclick="switchTab('logs',this)" data-i18n="nav_logs">📜 系统日志</button>
+      <button onclick="switchTab('settings',this)" data-i18n="nav_settings">⚙️ 设置与备份</button>
+    </nav>
+    <div class="side-foot">
+      <div>Xray Core <span id="xray-ver">-</span></div>
+      <div>Local-First · 127.0.0.1</div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <div class="pills">
+        <span class="pill"><i id="dot-xray" class="dot"></i>Xray <b id="st-xray">-</b></span>
+        <span class="pill"><i id="dot-nft" class="dot"></i><span data-i18n="fw">防火墙</span> <b id="st-nft">-</b></span>
+        <span class="pill"><i id="dot-f2b" class="dot"></i>Fail2ban <b id="st-f2b">-</b></span>
+        <span class="pill"><span data-i18n="uptime">在线</span> <b id="uptime">-</b></span>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="toggleLang()" id="lang-btn">EN</button>
+        <button class="btn" onclick="toggleTheme()" id="theme-btn">☀️ 浅色</button>
+        <a class="btn" href="/logout" data-i18n="logout">退出</a>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <section id="tab-dash" class="tab-pane active">
+      <div class="grid4">
+        <div class="card">
+          <div class="k" data-i18n="kpi_today">今日流量 / 本月累计</div>
+          <div class="v" id="tr-today">-</div>
+          <div class="sub" id="tr-month">-</div>
+        </div>
+        <div class="card">
+          <div class="k" data-i18n="kpi_rate">实时下载速率</div>
+          <div class="v" id="tr-rate">-</div>
+          <div class="sub" id="active-conns">-</div>
+        </div>
+        <div class="card">
+          <div class="k" data-i18n="kpi_mem">内存 / CPU 负载</div>
+          <div class="v" id="mem-val">-</div>
+          <div class="bar"><i id="mem-bar" style="width:0%"></i></div>
+          <div class="sub" id="cpu-load">-</div>
+        </div>
+        <div class="card">
+          <div class="k" data-i18n="kpi_sec">SSH 防爆破 / 磁盘</div>
+          <div class="v" id="f2b-tot">-</div>
+          <div class="sub" id="disk-val">-</div>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card">
+          <div class="card-title">
+            <span data-i18n="chart_live">实时速率趋势（5秒）</span>
+            <span class="sub"><span style="color:#38bdf8">●</span> ↓ &nbsp; <span style="color:#f59e0b">●</span> ↑</span>
+          </div>
+          <canvas id="chart-live" class="chart"></canvas>
+        </div>
+        <div class="card">
+          <div class="card-title">
+            <span data-i18n="chart_daily">近 14 天持久化流量（SQLite）</span>
+            <span class="sub" id="tr-total">-</span>
+          </div>
+          <canvas id="chart-daily" class="chart"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">
+          <span data-i18n="quick_ops">快捷运维</span>
+          <span class="sub" id="dash-summary">-</span>
+        </div>
+        <div class="btns" style="margin-top:0">
+          <button class="btn primary" onclick="openAddModal()" data-i18n="btn_add_node">➕ 新增节点</button>
+          <button class="btn info" onclick="selfCheck('reality-in')" data-i18n="btn_check">🩺 主节点一键自检</button>
+          <button class="btn" onclick="doPost('/api/restart-xray',{},T('confirm_restart'))" data-i18n="btn_restart">♻️ 重启 Xray</button>
+          <a class="btn" href="/api/backup" data-i18n="btn_backup">💾 一键下载配置备份</a>
+        </div>
+        <div id="check-res" class="check-res"></div>
+      </div>
+    </section>
+
+    <!-- Nodes -->
+    <section id="tab-nodes" class="tab-pane">
+      <div class="card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+        <div>
+          <b data-i18n="nodes_title">入站节点列表</b>
+          <div class="sub" data-i18n="nodes_sub">支持 VLESS + Vision + Reality、VLESS + XHTTP、VLESS + WS；点击任意参数即可复制</div>
+        </div>
+        <button class="btn primary" onclick="openAddModal()" data-i18n="btn_add_node">➕ 新增节点</button>
+      </div>
+      <div id="nodes-list"></div>
+    </section>
+
+    <!-- Routing -->
+    <section id="tab-routing" class="tab-pane">
+      <div class="card">
+        <div class="card-title"><span data-i18n="routing_title">路由规则与出站策略</span></div>
+        <div class="switch-row">
+          <div>
+            <b data-i18n="r_cn">拦截中国大陆网站与 IP（防回国绕路特征）</b>
+            <div class="sub" data-i18n="r_cn_sub">geosite:cn / geoip:cn → block（强烈建议开启，防止客户端分流失效暴露）</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="sw-cn"><span class="slider"></span></label>
+        </div>
+        <div class="switch-row">
+          <div>
+            <b data-i18n="r_bt">屏蔽 BitTorrent / P2P 下载</b>
+            <div class="sub" data-i18n="r_bt_sub">防止 BT 流量引发机房版权投诉或封机</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="sw-bt"><span class="slider"></span></label>
+        </div>
+        <div class="switch-row">
+          <div>
+            <b data-i18n="r_priv">屏蔽私有 / 局域网 IP 访问</b>
+            <div class="sub" data-i18n="r_priv_sub">geoip:private → block，防止 SSRF 探测内网</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="sw-priv"><span class="slider"></span></label>
+        </div>
+        <div class="switch-row">
+          <div>
+            <b data-i18n="r_out">出站 IP 优先级策略</b>
+            <div class="sub" data-i18n="r_out_sub">推荐仅 IPv4（UseIPv4），避免 VPS IPv6 触发 Google / ChatGPT 验证码</div>
+          </div>
+          <select id="sel-strategy" style="padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text)">
+            <option value="UseIPv4">UseIPv4（仅 IPv4 出站 · 推荐）</option>
+            <option value="UseIPv4v6">UseIPv4v6（IPv4 优先，双栈）</option>
+            <option value="UseIPv6v4">UseIPv6v4（IPv6 优先，双栈）</option>
+            <option value="AsIs">AsIs（系统默认）</option>
+          </select>
+        </div>
+        <div class="btns">
+          <button class="btn primary" onclick="saveRouting()" data-i18n="btn_save_routing">保存并生效</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Logs -->
+    <section id="tab-logs" class="tab-pane">
+      <div class="card">
+        <div class="card-title">
+          <div class="log-tabs">
+            <button class="btn active" onclick="showLog('xray',this)">Xray</button>
+            <button class="btn" onclick="showLog('fail2ban',this)">Fail2ban</button>
+            <button class="btn" onclick="showLog('firewall',this)" data-i18n="fw">防火墙</button>
+          </div>
+          <button class="btn" onclick="loadLogs()" data-i18n="btn_refresh">刷新</button>
+        </div>
+        <pre id="logs-pre">Loading...</pre>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section id="tab-settings" class="tab-pane">
+      <div class="grid2">
+        <div class="card">
+          <div class="card-title" data-i18n="set_pw">修改面板登录密码</div>
+          <div class="row"><input id="pw-old" type="password" placeholder="当前密码 / Current password"></div>
+          <div class="row"><input id="pw-new" type="password" placeholder="新密码（至少 8 位） / New password"></div>
+          <div class="row"><input id="pw-new2" type="password" placeholder="确认新密码 / Confirm password"></div>
+          <div class="btns">
+            <button class="btn primary" onclick="changePassword()" data-i18n="btn_save_pw">保存新密码</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title" data-i18n="set_backup">备份与项目信息</div>
+          <p class="sub" style="font-size:13px;line-height:1.8">
+            <b>QuackUI v2.0.0</b> · by FanDuck<br>
+            • Local-First：仅监听 <code>127.0.0.1:8088</code>，零公网暴露<br>
+            • 零第三方 Python 依赖（纯标准库 + SQLite3）<br>
+            • 源码目录：<code>/opt/quackui/</code>（已含 <code>install.sh</code>、<code>README.md</code>、<code>.gitignore</code>）
+          </p>
+          <div class="btns">
+            <a class="btn info" href="/api/backup" data-i18n="btn_backup">💾 一键下载配置备份 (.tar.gz)</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Add Node Modal -->
+<div class="modal-bg" id="modal-add">
+  <div class="modal">
+    <h3><span data-i18n="btn_add_node">➕ 新增节点</span><button class="btn" onclick="closeModal('modal-add')">✕</button></h3>
+    <div class="row"><input id="add-remark" placeholder="节点备注，如 SJ-Reality-2"></div>
+    <div class="row">
+      <select id="add-mode" onchange="onModeChange()">
+        <option value="reality">VLESS + Vision + Reality</option>
+        <option value="xhttp">VLESS + XHTTP（适合配合 CDN/Nginx）</option>
+        <option value="ws">VLESS + WebSocket（适合配合 CDN/Nginx）</option>
+      </select>
+    </div>
+    <div class="row">
+      <select id="add-listen">
+        <option value="ipv6">仅 IPv6 监听（推荐防封）</option>
+        <option value="dual">IPv4 + IPv6 双栈（::）</option>
+        <option value="ipv4">仅 IPv4 监听（0.0.0.0）</option>
+        <option value="local">仅本机 127.0.0.1（前置 Nginx 反代）</option>
+      </select>
+      <input id="add-port" type="number" value="8443" placeholder="端口">
+    </div>
+    <div class="row" id="row-sni"><input id="add-sni" value="www.berkeley.edu" placeholder="Reality 伪装域名 SNI"></div>
+    <div class="row" id="row-path" style="display:none"><input id="add-path" placeholder="路径，留空自动随机生成"></div>
+    <div class="btns" style="justify-content:flex-end;margin-top:16px">
+      <button class="btn" onclick="closeModal('modal-add')">取消</button>
+      <button class="btn primary" onclick="submitAddNode()">创建并启用</button>
+    </div>
+  </div>
+</div>
+
+<!-- QR Modal -->
+<div class="modal-bg" id="modal-qr">
+  <div class="modal" style="text-align:center">
+    <h3><span id="qr-title">扫码导入</span><button class="btn" onclick="closeModal('modal-qr')">✕</button></h3>
+    <div class="qr-box" id="qr-content">...</div>
+    <p class="sub">服务器本地 <code>qrencode</code> 离线生成 · 小火箭 / v2rayN 直接扫码</p>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const I18N = {
+  zh: {
+    nav_dash:'📊 仪表盘', nav_nodes:'🚀 节点管理', nav_routing:'🧭 路由与出站', nav_logs:'📜 系统日志', nav_settings:'⚙️ 设置与备份',
+    fw:'防火墙', uptime:'在线', logout:'退出',
+    kpi_today:'今日流量 / 本月累计', kpi_rate:'实时下载速率', kpi_mem:'内存 / CPU 负载', kpi_sec:'SSH 防爆破 / 磁盘',
+    chart_live:'实时速率趋势（5秒）', chart_daily:'近 14 天持久化流量（SQLite）', quick_ops:'快捷运维',
+    btn_add_node:'➕ 新增节点', btn_check:'🩺 主节点一键自检', btn_restart:'♻️ 重启 Xray', btn_backup:'💾 一键下载配置备份',
+    nodes_title:'入站节点列表', nodes_sub:'支持 VLESS + Vision + Reality、VLESS + XHTTP、VLESS + WS；点击任意参数即可复制',
+    routing_title:'路由规则与出站策略', r_cn:'拦截中国大陆网站与 IP（防回国绕路特征）', r_cn_sub:'geosite:cn / geoip:cn → block（强烈建议开启）',
+    r_bt:'屏蔽 BitTorrent / P2P 下载', r_bt_sub:'防止 BT 流量引发机房投诉或封机',
+    r_priv:'屏蔽私有 / 局域网 IP 访问', r_priv_sub:'geoip:private → block，防止内网探测',
+    r_out:'出站 IP 优先级策略', r_out_sub:'推荐仅 IPv4（UseIPv4），避免 IPv6 触发 Google 验证码',
+    btn_save_routing:'保存并生效', btn_refresh:'刷新', set_pw:'修改面板登录密码', btn_save_pw:'保存新密码', set_backup:'备份与项目信息',
+    confirm_restart:'确认重启 Xray 服务吗？', copied:'已复制到剪贴板'
+  },
+  en: {
+    nav_dash:'📊 Dashboard', nav_nodes:'🚀 Nodes', nav_routing:'🧭 Routing', nav_logs:'📜 Logs', nav_settings:'⚙️ Settings',
+    fw:'Firewall', uptime:'Up', logout:'Logout',
+    kpi_today:'Today / Monthly Traffic', kpi_rate:'Live Download Rate', kpi_mem:'Memory / CPU Load', kpi_sec:'Fail2ban SSH / Disk',
+    chart_live:'Live Speed (5s)', chart_daily:'14-Day Persisted Traffic (SQLite)', quick_ops:'Quick Actions',
+    btn_add_node:'➕ Add Node', btn_check:'🩺 Self-Check Node', btn_restart:'♻️ Restart Xray', btn_backup:'💾 Download Backup',
+    nodes_title:'Inbound Nodes', nodes_sub:'Supports VLESS+Reality, XHTTP, and WS. Click any field to copy.',
+    routing_title:'Routing & Outbound Policy', r_cn:'Block Mainland China (CN) Traffic', r_cn_sub:'geosite:cn / geoip:cn → block (recommended)',
+    r_bt:'Block BitTorrent / P2P', r_bt_sub:'Avoid abuse complaints on VPS',
+    r_priv:'Block Private / LAN IPs', r_priv_sub:'geoip:private → block',
+    r_out:'Outbound IP Strategy', r_out_sub:'UseIPv4 avoids CAPTCHA on Google/AI services',
+    btn_save_routing:'Save & Apply', btn_refresh:'Refresh', set_pw:'Change Panel Password', btn_save_pw:'Save Password', set_backup:'Backup & About',
+    confirm_restart:'Restart Xray service?', copied:'Copied to clipboard'
+  }
+};
+let LANG = localStorage.getItem('quackui_lang') || 'zh';
+function T(k){ return (I18N[LANG] && I18N[LANG][k]) || I18N.zh[k] || k; }
+function applyLang(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = T(el.getAttribute('data-i18n')); });
+  document.getElementById('lang-btn').textContent = LANG==='zh'?'EN':'中';
+}
+function toggleLang(){
+  LANG = LANG==='zh'?'en':'zh';
+  localStorage.setItem('quackui_lang', LANG);
+  applyLang();
+}
+
+const HIST = { down:[], up:[], max:40 };
+let DAILY = [];
+let LOG_CACHE = { xray:'', fail2ban:'', firewall:'' };
+let CUR_LOG = 'xray';
+let ROUTING_LOADED = false;
+
+function fmtBytes(b){
+  b = Number(b)||0;
+  if(b<1024) return b.toFixed(0)+' B';
+  const u=['KB','MB','GB','TB']; let i=-1;
+  do{ b/=1024; i++; }while(b>=1024 && i<u.length-1);
+  return b.toFixed(i>=2?2:1)+' '+u[i];
+}
+function fmtUptime(s){
+  const d=Math.floor(s/86400), h=Math.floor((s%86400)/3600), m=Math.floor((s%3600)/60);
+  return LANG==='en' ? `${d}d ${h}h ${m}m` : (d?d+'天 ':'')+(h?h+'时 ':'')+m+'分';
+}
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
+  clearTimeout(window._tt); window._tt=setTimeout(()=>t.style.display='none',3200);
+}
+function switchTab(id,btn){
+  document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  if(id==='logs') loadLogs();
+  if(id==='dash'){ drawLiveChart(); drawDailyChart(); }
+}
+function toggleTheme(){
+  const cur = document.documentElement.getAttribute('data-theme')==='light'?'dark':'light';
+  document.documentElement.setAttribute('data-theme', cur);
+  localStorage.setItem('quackui_theme', cur);
+  document.getElementById('theme-btn').textContent = cur==='light'?'🌙 深色':'☀️ 浅色';
+  drawLiveChart(); drawDailyChart();
+}
+(function(){
+  const saved = localStorage.getItem('quackui_theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', saved);
+  document.getElementById('theme-btn').textContent = saved==='light'?'🌙 深色':'☀️ 浅色';
+  applyLang();
+})();
+
+function setSvc(dotId, stId, st){
+  const ok = st==='active';
+  document.getElementById(dotId).className = 'dot'+(ok?'':' bad');
+  document.getElementById(stId).textContent = ok?(LANG==='en'?'OK':'正常'):st;
+}
+
+function drawLiveChart(){
+  const cv = document.getElementById('chart-live'); if(!cv) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth || 500, h = 175;
+  cv.width = w*dpr; cv.height = h*dpr;
+  const ctx = cv.getContext('2d'); ctx.scale(dpr,dpr); ctx.clearRect(0,0,w,h);
+  const maxV = Math.max(1024, ...HIST.down, ...HIST.up) * 1.15;
+  const pad = { l:56, r:12, t:12, b:20 }, cw = w-pad.l-pad.r, ch = h-pad.t-pad.b;
+  ctx.strokeStyle = 'rgba(148,163,184,.14)'; ctx.fillStyle = '#94a3b8'; ctx.font = '11px ui-monospace,Consolas,monospace';
+  for(let i=0;i<=3;i++){
+    const y = pad.t + ch*(i/3);
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
+    ctx.fillText(fmtBytes(maxV*(1-i/3))+'/s', 4, y+4);
+  }
+  function plot(arr, color, fill){
+    if(arr.length<2) return;
+    ctx.beginPath();
+    arr.forEach((v,idx)=>{
+      const x = pad.l + cw*(idx/(HIST.max-1));
+      const y = pad.t + ch*(1-Math.min(v,maxV)/maxV);
+      idx===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+    });
+    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.stroke();
+    ctx.lineTo(pad.l+cw*((arr.length-1)/(HIST.max-1)), pad.t+ch);
+    ctx.lineTo(pad.l, pad.t+ch); ctx.closePath(); ctx.fillStyle=fill; ctx.fill();
+  }
+  plot(HIST.down, '#38bdf8', 'rgba(56,189,248,.12)');
+  plot(HIST.up, '#f59e0b', 'rgba(245,158,11,.10)');
+}
+
+function drawDailyChart(){
+  const cv = document.getElementById('chart-daily'); if(!cv || !DAILY.length) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth || 500, h = 175;
+  cv.width = w*dpr; cv.height = h*dpr;
+  const ctx = cv.getContext('2d'); ctx.scale(dpr,dpr); ctx.clearRect(0,0,w,h);
+  const totals = DAILY.map(x=>x.up+x.down);
+  const maxV = Math.max(1024*1024, ...totals) * 1.15;
+  const pad = { l:52, r:10, t:12, b:24 }, cw = w-pad.l-pad.r, ch = h-pad.t-pad.b;
+  ctx.strokeStyle = 'rgba(148,163,184,.14)'; ctx.fillStyle = '#94a3b8'; ctx.font = '10.5px ui-monospace,Consolas,monospace';
+  for(let i=0;i<=3;i++){
+    const y = pad.t + ch*(i/3);
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
+    ctx.fillText(fmtBytes(maxV*(1-i/3)), 4, y+4);
+  }
+  const step = cw / DAILY.length;
+  const bw = Math.max(8, step * 0.56);
+  DAILY.forEach((d, i)=>{
+    const x = pad.l + i*step + (step-bw)/2;
+    const tot = d.up + d.down;
+    const bh = Math.max(tot>0?3:0, ch * (tot / maxV));
+    const grad = ctx.createLinearGradient(0, pad.t+ch-bh, 0, pad.t+ch);
+    grad.addColorStop(0, '#38bdf8'); grad.addColorStop(1, '#f59e0b');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, pad.t+ch-bh, bw, bh);
+    if(i%2===0 || i===DAILY.length-1){
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillText(d.date, x-4, h-6);
+    }
+  });
+}
+
+function renderNodes(nodes){
+  const box = document.getElementById('nodes-list');
+  if(!nodes.length){ box.innerHTML = '<div class="card sub">暂无节点</div>'; return; }
+  box.innerHTML = nodes.map(n=>{
+    const tr = fmtBytes((n.traffic.up||0)+(n.traffic.down||0));
+    const isReality = n.security==='reality';
+    const safeUri = encodeURIComponent(n.uri||'');
+    const safeClash = encodeURIComponent(n.clash_yaml||'');
+    return `<div class="node-card ${n.enabled?'':'off'}">
+      <div class="node-head">
+        <div>
+          <b>${n.remark}</b>
+          <div class="node-tags" style="margin-top:6px">
+            <span class="tag ${n.enabled?'ok':''}">${n.enabled?'运行中':'已停用'}</span>
+            <span class="tag accent">${n.protocol.toUpperCase()} · ${isReality?'Reality':n.network.toUpperCase()}</span>
+            <span class="tag">${n.listen}:${n.port}</span>
+            <span class="tag">累计 ${tr}</span>
+          </div>
+        </div>
+        <div class="btns" style="margin-top:0">
+          <button class="btn primary" onclick="copyText(decodeURIComponent('${safeUri}'))">📋 复制链接</button>
+          <button class="btn info" onclick="copyText(decodeURIComponent('${safeClash}'))">⚡ Clash YAML</button>
+          <button class="btn" onclick="openQr('${n.remark}', decodeURIComponent('${safeUri}'))">📱 二维码</button>
+          <button class="btn" onclick="doPost('/api/nodes/toggle',{tag:'${n.tag}'})">${n.enabled?'⏸ 停用':'▶ 启用'}</button>
+          <button class="btn danger" onclick="doPost('/api/nodes/delete',{tag:'${n.tag}'},'确认删除节点 ${n.remark} 吗？')">🗑 删除</button>
+        </div>
+      </div>
+      <div class="kv">
+        <div class="lbl">UUID</div><div class="mono" onclick="copyText(this.textContent)">${n.uuid}</div>
+        ${isReality ? `
+          <div class="lbl">伪装 SNI</div><div class="mono" onclick="copyText(this.textContent)">${n.sni}</div>
+          <div class="lbl">PublicKey</div><div class="mono" onclick="copyText(this.textContent)">${n.pub}</div>
+          <div class="lbl">ShortId</div><div class="mono" onclick="copyText(this.textContent)">${n.sid}</div>
+        ` : `
+          <div class="lbl">Path</div><div class="mono" onclick="copyText(this.textContent)">${n.path}</div>
+        `}
+      </div>
+      ${n.enabled ? `<div class="btns">
+        ${n.is_v6 ? `<button class="btn warn" onclick="doPost('/api/rotate-v6',{tag:'${n.tag}'},'确认从 /64 网段更换一个新的 IPv6 地址吗？')">🔄 一键换 IPv6</button>` : ''}
+        ${isReality ? `<button class="btn info" onclick="promptSni('${n.tag}','${n.sni}')">🌐 修改 SNI</button>` : ''}
+        <button class="btn" onclick="doPost('/api/rotate-cred',{tag:'${n.tag}'},'确认重置该节点的 UUID / ShortId 吗？')">🔑 重置密钥</button>
+        ${isReality ? `<button class="btn" onclick="selfCheck('${n.tag}')">🩺 自检</button>` : ''}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function refresh(){
+  try{
+    const r = await fetch('/api/status');
+    if(r.status===401){ location.href='/login'; return; }
+    const d = await r.json();
+    document.getElementById('ver').textContent = d.sys.version;
+    document.getElementById('xray-ver').textContent = d.sys.xray_version;
+    setSvc('dot-xray','st-xray',d.sys.services.xray);
+    setSvc('dot-nft','st-nft',d.sys.services.nftables);
+    setSvc('dot-f2b','st-f2b',d.sys.services.fail2ban);
+    document.getElementById('uptime').textContent = fmtUptime(d.sys.uptime_sec);
+
+    const td = d.traffic.today.up + d.traffic.today.down;
+    const tm = d.traffic.month.up + d.traffic.month.down;
+    const ta = d.traffic.total.up + d.traffic.total.down;
+    document.getElementById('tr-today').textContent = fmtBytes(td);
+    document.getElementById('tr-month').textContent = `本月 ${fmtBytes(tm)} · ↑${fmtBytes(d.traffic.today.up)} ↓${fmtBytes(d.traffic.today.down)}`;
+    document.getElementById('tr-total').textContent = `历史总计 ${fmtBytes(ta)}`;
+    document.getElementById('tr-rate').textContent = fmtBytes(d.traffic.down_rate)+'/s';
+    document.getElementById('active-conns').textContent = `↑ ${fmtBytes(d.traffic.up_rate)}/s · 活跃连接 ${d.sys.active_conns}`;
+
+    const mp = Math.round(d.sys.mem_used*100/d.sys.mem_total);
+    document.getElementById('mem-val').textContent = `${fmtBytes(d.sys.mem_used)} / ${fmtBytes(d.sys.mem_total)}`;
+    document.getElementById('mem-bar').style.width = mp+'%';
+    document.getElementById('cpu-load').textContent = `CPU (${d.sys.cpus}核) 负载: ${d.sys.load.join(' / ')}`;
+    document.getElementById('f2b-tot').textContent = `${d.sys.fail2ban.total} 次`;
+    document.getElementById('disk-val').textContent = `封禁中 ${d.sys.fail2ban.current} · 磁盘 ${fmtBytes(d.sys.disk_used)}/${fmtBytes(d.sys.disk_total)}`;
+
+    const enabledCnt = d.nodes.filter(x=>x.enabled).length;
+    document.getElementById('dash-summary').textContent = `共 ${d.nodes.length} 个节点（${enabledCnt} 个运行中）· 出站 ${d.routing.outbound_strategy}`;
+
+    HIST.down.push(d.traffic.down_rate); HIST.up.push(d.traffic.up_rate);
+    if(HIST.down.length>HIST.max){ HIST.down.shift(); HIST.up.shift(); }
+    DAILY = d.traffic.daily_history || [];
+    drawLiveChart(); drawDailyChart();
+    renderNodes(d.nodes);
+
+    if(!ROUTING_LOADED){
+      document.getElementById('sw-cn').checked = d.routing.block_cn;
+      document.getElementById('sw-bt').checked = d.routing.block_bt;
+      document.getElementById('sw-priv').checked = d.routing.block_private;
+      document.getElementById('sel-strategy').value = d.routing.outbound_strategy;
+      ROUTING_LOADED = true;
+    }
+  }catch(e){}
+}
+
+async function doPost(url, payload, confirmMsg){
+  if(confirmMsg && !confirm(confirmMsg)) return;
+  toast('正在执行...');
+  const r = await fetch(url, {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload||{})});
+  const d = await r.json();
+  toast(d.ok ? d.msg : ('失败: '+d.err));
+  refresh();
+}
+function promptSni(tag, cur){
+  const ns = prompt('输入新的伪装域名（需支持 TLS 1.3 + HTTP/2）：', cur);
+  if(ns && ns.trim() && ns.trim()!==cur) doPost('/api/set-sni', {tag, sni:ns.trim()});
+}
+function openAddModal(){ document.getElementById('modal-add').classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+function onModeChange(){
+  const m = document.getElementById('add-mode').value;
+  document.getElementById('row-sni').style.display = m==='reality'?'flex':'none';
+  document.getElementById('row-path').style.display = m!=='reality'?'flex':'none';
+}
+async function submitAddNode(){
+  const payload = {
+    remark: document.getElementById('add-remark').value,
+    mode: document.getElementById('add-mode').value,
+    listen_type: document.getElementById('add-listen').value,
+    port: Number(document.getElementById('add-port').value),
+    sni: document.getElementById('add-sni').value,
+    path: document.getElementById('add-path').value,
+  };
+  toast('正在创建节点...');
+  const r = await fetch('/api/nodes/add', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const d = await r.json();
+  toast(d.ok ? d.msg : ('失败: '+d.err));
+  if(d.ok){ closeModal('modal-add'); refresh(); }
+}
+async function openQr(title, uri){
+  document.getElementById('qr-title').textContent = title;
+  document.getElementById('qr-content').innerHTML = '生成中...';
+  document.getElementById('modal-qr').classList.add('open');
+  const r = await fetch('/api/qr', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({uri})});
+  const d = await r.json();
+  document.getElementById('qr-content').innerHTML = d.svg || '生成失败';
+}
+async function selfCheck(tag){
+  const box = document.getElementById('check-res');
+  box.style.display = 'block';
+  box.innerHTML = '⏳ 正在通过本机 Reality 节点测试访问 Google...';
+  const r = await fetch('/api/self-check', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tag})});
+  const d = await r.json();
+  if(d.ok){
+    box.innerHTML = `✅ <b>节点 [${d.data.tag}] 正常</b> · Google 204 延迟 <b>${d.data.latency_ms} ms</b> · 出口 IP：<code>${d.data.outbound_ip}</code>`;
+  } else {
+    box.innerHTML = `❌ <b>自检失败</b> · HTTP ${d.data?d.data.http_code:'ERR'} ${d.err||''}`;
+  }
+}
+async function saveRouting(){
+  await doPost('/api/routing', {
+    block_cn: document.getElementById('sw-cn').checked,
+    block_bt: document.getElementById('sw-bt').checked,
+    block_private: document.getElementById('sw-priv').checked,
+    outbound_strategy: document.getElementById('sel-strategy').value,
+  });
+}
+async function loadLogs(){
+  const r = await fetch('/api/logs');
+  if(r.ok){ LOG_CACHE = await r.json(); document.getElementById('logs-pre').textContent = LOG_CACHE[CUR_LOG] || '暂无内容'; }
+}
+function showLog(k, btn){
+  CUR_LOG = k;
+  document.querySelectorAll('.log-tabs button').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  document.getElementById('logs-pre').textContent = LOG_CACHE[k] || '暂无内容';
+}
+function copyText(txt){
+  navigator.clipboard.writeText(txt).then(()=>toast(T('copied'))).catch(()=>toast('Copy failed'));
+}
+async function changePassword(){
+  const old_password = document.getElementById('pw-old').value;
+  const new_password = document.getElementById('pw-new').value;
+  const new_password2 = document.getElementById('pw-new2').value;
+  if(new_password !== new_password2){ toast('两次输入的新密码不一致'); return; }
+  await doPost('/api/change-password', {old_password, new_password});
+  document.getElementById('pw-old').value = '';
+  document.getElementById('pw-new').value = '';
+  document.getElementById('pw-new2').value = '';
+}
+
+window.addEventListener('resize', ()=>{ drawLiveChart(); drawDailyChart(); });
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body></html>
