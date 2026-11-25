@@ -11,6 +11,7 @@
   - 一键轮换 IPv6 `/64` 入站地址（自动探测网卡前缀并持久化）
   - 修改 Reality 伪装域名（SNI）前自动检测 TLS 1.3 + HTTP/2
   - 一键端到端节点自检（实测 Google 延迟与实际出口 IP）
+  - **Xray 内核版本管理**：内置拉取 GitHub 官方历史版本列表，支持一键升级或任意历史版本降级回退（切换前自动备份旧二进制，配置校验失败自动回滚）与 GeoIP/GeoSite 一键更新
 - **Full Persistence & Multi-Node / 流量持久化与多节点管理**：
   - SQLite 持久化记录今日 / 本月 / 近 14 天历史流量，重启不丢数据
   - 支持新增、启停、删除 VLESS + Vision + Reality / XHTTP / WS 节点

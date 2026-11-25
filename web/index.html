@@ -271,6 +271,25 @@
 
     <!-- Settings -->
     <section id="tab-settings" class="tab-pane">
+      <div class="card">
+        <div class="card-title">
+          <span data-i18n="xray_mgr">🔧 Xray 内核版本管理</span>
+          <span class="sub">当前版本：<b id="xray-cur-ver">-</b></span>
+        </div>
+        <p class="sub" style="margin-top:0" data-i18n="xray_mgr_sub">支持升级到最新版本或随时降级回退到任意历史版本；切换前自动备份旧内核，若新版本与当前配置不兼容将自动回滚，防止断联。</p>
+        <div class="row">
+          <select id="xray-ver-sel">
+            <option value="latest">最新正式版 (latest)</option>
+          </select>
+          <button class="btn" onclick="loadXrayReleases(true)" data-i18n="btn_refresh_ver">刷新版本列表</button>
+        </div>
+        <div class="btns">
+          <button class="btn primary" onclick="switchXrayVersion()" data-i18n="btn_switch_xray">⬆️ 切换 / 升级所选版本</button>
+          <button class="btn info" onclick="updateGeodata()" data-i18n="btn_geodata">🌍 更新 GeoIP / GeoSite</button>
+        </div>
+        <div id="xray-op-res" class="check-res"></div>
+      </div>
+
       <div class="grid2">
         <div class="card">
           <div class="card-title" data-i18n="set_pw">修改面板登录密码</div>
@@ -284,7 +303,7 @@
         <div class="card">
           <div class="card-title" data-i18n="set_backup">备份与项目信息</div>
           <p class="sub" style="font-size:13px;line-height:1.8">
-            <b>QuackUI v2.0.0</b> · by FanDuck<br>
+            <b>QuackUI v<span id="about-ver">2.0.1</span></b> · by FanDuck<br>
             • Local-First：仅监听 <code>127.0.0.1:8088</code>，零公网暴露<br>
             • 零第三方 Python 依赖（纯标准库 + SQLite3）<br>
             • 源码目录：<code>/opt/quackui/</code>（已含 <code>install.sh</code>、<code>README.md</code>、<code>.gitignore</code>）
@@ -353,6 +372,8 @@ const I18N = {
     r_priv:'屏蔽私有 / 局域网 IP 访问', r_priv_sub:'geoip:private → block，防止内网探测',
     r_out:'出站 IP 优先级策略', r_out_sub:'推荐仅 IPv4（UseIPv4），避免 IPv6 触发 Google 验证码',
     btn_save_routing:'保存并生效', btn_refresh:'刷新', set_pw:'修改面板登录密码', btn_save_pw:'保存新密码', set_backup:'备份与项目信息',
+    xray_mgr:'🔧 Xray 内核版本管理', xray_mgr_sub:'支持升级到最新版本或随时降级回退到任意历史版本；切换前自动备份旧内核，若新版本与当前配置不兼容将自动回滚，防止断联。',
+    btn_refresh_ver:'刷新版本列表', btn_switch_xray:'⬆️ 切换 / 升级所选版本', btn_geodata:'🌍 更新 GeoIP / GeoSite',
     confirm_restart:'确认重启 Xray 服务吗？', copied:'已复制到剪贴板'
   },
   en: {
@@ -367,6 +388,8 @@ const I18N = {
     r_priv:'Block Private / LAN IPs', r_priv_sub:'geoip:private → block',
     r_out:'Outbound IP Strategy', r_out_sub:'UseIPv4 avoids CAPTCHA on Google/AI services',
     btn_save_routing:'Save & Apply', btn_refresh:'Refresh', set_pw:'Change Panel Password', btn_save_pw:'Save Password', set_backup:'Backup & About',
+    xray_mgr:'🔧 Xray Core Version Manager', xray_mgr_sub:'Upgrade to latest or rollback to any historical release. Automatically backs up the current binary and rolls back if config validation fails.',
+    btn_refresh_ver:'Refresh Releases', btn_switch_xray:'⬆️ Switch / Upgrade Core', btn_geodata:'🌍 Update GeoIP / GeoSite',
     confirm_restart:'Restart Xray service?', copied:'Copied to clipboard'
   }
 };
@@ -409,6 +432,7 @@ function switchTab(id,btn){
   document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
   if(id==='logs') loadLogs();
+  if(id==='settings') loadXrayReleases(false);
   if(id==='dash'){ drawLiveChart(); drawDailyChart(); }
 }
 function toggleTheme(){
@@ -546,7 +570,9 @@ async function refresh(){
     if(r.status===401){ location.href='/login'; return; }
     const d = await r.json();
     document.getElementById('ver').textContent = d.sys.version;
+    document.getElementById('about-ver').textContent = d.sys.version;
     document.getElementById('xray-ver').textContent = d.sys.xray_version;
+    document.getElementById('xray-cur-ver').textContent = d.sys.xray_version;
     setSvc('dot-xray','st-xray',d.sys.services.xray);
     setSvc('dot-nft','st-nft',d.sys.services.nftables);
     setSvc('dot-f2b','st-f2b',d.sys.services.fail2ban);
@@ -671,6 +697,57 @@ async function changePassword(){
   document.getElementById('pw-old').value = '';
   document.getElementById('pw-new').value = '';
   document.getElementById('pw-new2').value = '';
+}
+
+let XRAY_RELEASES_LOADED = false;
+async function loadXrayReleases(force){
+  if(XRAY_RELEASES_LOADED && !force) return;
+  const sel = document.getElementById('xray-ver-sel');
+  try{
+    const r = await fetch('/api/xray/releases' + (force?'?force=1':''));
+    const d = await r.json();
+    if(!d.ok){ toast('获取版本列表失败: '+(d.err||'')); return; }
+    document.getElementById('xray-cur-ver').textContent = d.current;
+    let opts = '<option value="latest">最新正式版 (latest)</option>';
+    (d.releases||[]).forEach(x=>{
+      const curTag = x.version===d.current ? ' [当前]' : '';
+      const preTag = x.prerelease ? ' [Pre-release]' : '';
+      opts += `<option value="${x.version}">v${x.version} (${x.date})${preTag}${curTag}</option>`;
+    });
+    sel.innerHTML = opts;
+    XRAY_RELEASES_LOADED = true;
+    if(force) toast('已刷新 Xray 官方版本列表');
+  }catch(e){ toast('请求版本列表失败'); }
+}
+async function switchXrayVersion(){
+  const ver = document.getElementById('xray-ver-sel').value;
+  if(!confirm(`确认将 Xray 内核切换到 ${ver} 吗？\n切换前会自动备份旧内核，若配置不兼容会自动回滚。`)) return;
+  const box = document.getElementById('xray-op-res');
+  box.style.display = 'block';
+  box.innerHTML = `⏳ 正在下载并切换 Xray 内核至 <b>${ver}</b>，可能需要 15-40 秒，请勿关闭页面...`;
+  try{
+    const r = await fetch('/api/xray/switch-version', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:ver})});
+    const d = await r.json();
+    if(d.ok){
+      box.innerHTML = `✅ <b>${d.msg}</b>`;
+      toast(d.msg);
+      loadXrayReleases(true); refresh();
+    } else {
+      box.innerHTML = `❌ <b>切换失败</b>：${d.err}`;
+      toast('切换失败，已保持原版本');
+    }
+  }catch(e){
+    box.innerHTML = '❌ 请求超时或网络异常';
+  }
+}
+async function updateGeodata(){
+  const box = document.getElementById('xray-op-res');
+  box.style.display = 'block';
+  box.innerHTML = '⏳ 正在更新 GeoIP / GeoSite 路由数据...';
+  const r = await fetch('/api/xray/update-geodata', {method:'POST'});
+  const d = await r.json();
+  box.innerHTML = d.ok ? `✅ <b>${d.msg}</b>` : `❌ <b>更新失败</b>：${d.err}`;
+  toast(d.ok ? d.msg : d.err);
 }
 
 window.addEventListener('resize', ()=>{ drawLiveChart(); drawDailyChart(); });

@@ -20,11 +20,12 @@ import subprocess
 import tarfile
 import threading
 import time
+import urllib.request
 from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote, unquote_plus
 
-VERSION = "2.0.0"
+VERSION = "2.0.1"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WEB_DIR = os.path.join(BASE_DIR, "web")
 CFG_PATH = os.path.join(BASE_DIR, "config.json")
@@ -40,6 +41,7 @@ DB_LOCK = threading.Lock()
 TRAFFIC_LOCK = threading.Lock()
 PREV_COUNTERS = {}   # tag -> (up, down)
 RATES = {"up": 0.0, "down": 0.0, "ts": 0.0}
+RELEASES_CACHE = {"ts": 0.0, "items": []}
 
 
 def load_cfg():
@@ -790,6 +792,95 @@ def self_check_node(tag="reality-in"):
             os.remove(tmp_cfg)
 
 
+def get_xray_version():
+    _, out, _ = run_cmd(["xray", "version"], timeout=3)
+    if out:
+        parts = out.splitlines()[0].split()
+        if len(parts) >= 2:
+            return parts[1]
+    return "-"
+
+
+def fetch_xray_releases(force=False):
+    """Fetch recent Xray-core releases from GitHub API with 10-minute cache."""
+    now = time.time()
+    if not force and RELEASES_CACHE["items"] and (now - RELEASES_CACHE["ts"] < 600):
+        return RELEASES_CACHE["items"]
+    req = urllib.request.Request(
+        "https://api.github.com/repos/XTLS/Xray-core/releases?per_page=20",
+        headers={"User-Agent": f"QuackUI/{VERSION}", "Accept": "application/vnd.github+json"},
+    )
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        raw = json.loads(resp.read().decode("utf-8"))
+    items = []
+    for r in raw:
+        tag = r.get("tag_name", "")
+        if not tag:
+            continue
+        items.append({
+            "version": tag.lstrip("v"),
+            "tag": tag,
+            "date": (r.get("published_at") or "")[:10],
+            "prerelease": bool(r.get("prerelease")),
+        })
+    RELEASES_CACHE["ts"] = now
+    RELEASES_CACHE["items"] = items
+    return items
+
+
+def switch_xray_version(target_ver):
+    """Upgrade or downgrade Xray-core safely with automatic rollback on failure."""
+    target_ver = (target_ver or "").strip()
+    if target_ver != "latest":
+        target_ver = target_ver.lstrip("v")
+        if not re.match(r"^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$", target_ver):
+            raise RuntimeError("版本号格式不正确")
+
+    xray_bin = "/usr/local/bin/xray"
+    bak_bin = "/usr/local/bin/xray.bak"
+    old_ver = get_xray_version()
+    if os.path.exists(xray_bin):
+        shutil.copy2(xray_bin, bak_bin)
+
+    install_cmd = (
+        'bash -c "$(curl -fsSL https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install'
+        if target_ver == "latest"
+        else f'bash -c "$(curl -fsSL https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install --version {target_ver}'
+    )
+    code, _, err = run_cmd(["bash", "-c", install_cmd], timeout=120)
+    if code != 0:
+        if os.path.exists(bak_bin):
+            shutil.copy2(bak_bin, xray_bin)
+            run_cmd(["systemctl", "restart", "xray"])
+        raise RuntimeError(f"安装 Xray 失败，已保留原版本 {old_ver}: {err[-200:]}")
+
+    # Validate existing config and restart; auto-rollback if incompatible
+    tc, _, terr = run_cmd(["xray", "run", "-test", "-c", XRAY_CFG], timeout=10)
+    rc = 1
+    if tc == 0:
+        rc, _, _ = run_cmd(["systemctl", "restart", "xray"], timeout=15)
+        time.sleep(1)
+        _, st, _ = run_cmd(["systemctl", "is-active", "xray"], timeout=5)
+        if st != "active":
+            rc = 1
+
+    if tc != 0 or rc != 0:
+        if os.path.exists(bak_bin):
+            shutil.copy2(bak_bin, xray_bin)
+            run_cmd(["systemctl", "restart", "xray"], timeout=15)
+        raise RuntimeError(f"目标版本与当前配置不兼容，已自动回滚到 {old_ver}: {terr[-180:]}")
+
+    return {"old_version": old_ver, "new_version": get_xray_version()}
+
+
+def update_geodata():
+    cmd = 'bash -c "$(curl -fsSL https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install-geodata'
+    code, _, err = run_cmd(["bash", "-c", cmd], timeout=90)
+    if code != 0:
+        raise RuntimeError(f"更新 GeoData 失败: {err[-180:]}")
+    run_cmd(["systemctl", "restart", "xray"], timeout=15)
+
+
 def build_backup_tar_gz():
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
@@ -933,6 +1024,18 @@ class Handler(BaseHTTPRequestHandler):
             _, f2b_log, _ = run_cmd(["fail2ban-client", "status", "sshd"], timeout=4)
             _, nft_log, _ = run_cmd(["nft", "list", "ruleset"], timeout=4)
             self._send_json({"xray": xray_log, "fail2ban": f2b_log, "firewall": nft_log})
+        elif path == "/api/xray/releases":
+            force = "force=1" in self.path
+            try:
+                items = fetch_xray_releases(force=force)
+                self._send_json({
+                    "ok": True,
+                    "current": get_xray_version(),
+                    "has_backup": os.path.exists("/usr/local/bin/xray.bak"),
+                    "releases": items,
+                })
+            except Exception as e:
+                self._send_json({"ok": False, "current": get_xray_version(), "err": str(e)}, 502)
         elif path == "/api/backup":
             data = build_backup_tar_gz()
             fname = f"quackui-backup-{datetime.date.today().strftime('%Y%m%d')}.tar.gz"
@@ -1012,6 +1115,16 @@ class Handler(BaseHTTPRequestHandler):
                 if code != 0:
                     raise RuntimeError(err)
                 self._send_json({"ok": True, "msg": "Xray 服务已重启"})
+            elif path == "/api/xray/switch-version":
+                res = switch_xray_version(data.get("version", ""))
+                self._send_json({
+                    "ok": True,
+                    "data": res,
+                    "msg": f"Xray 已从 {res['old_version']} 切换到 {res['new_version']}",
+                })
+            elif path == "/api/xray/update-geodata":
+                update_geodata()
+                self._send_json({"ok": True, "msg": "GeoIP / GeoSite 数据已更新并重启 Xray"})
             elif path == "/api/self-check":
                 res = self_check_node(data.get("tag", "reality-in"))
                 self._send_json({"ok": res["ok"], "data": res, "msg": "节点自检通过" if res["ok"] else "节点自检失败"})
