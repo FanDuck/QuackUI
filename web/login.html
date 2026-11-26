@@ -5,27 +5,43 @@
 <title>QuackUI</title>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='40' y2='40' gradientUnits='userSpaceOnUse'%3E%3Cstop stop-color='%23fbbf24'/%3E%3Cstop offset='1' stop-color='%2338bdf8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='40' height='40' rx='12' fill='url(%23g)'/%3E%3Cpath d='M12 24c0-5 3.5-8 8.5-8 2.6 0 4.5-1.4 4.5-3.3 0-1.6-1.3-2.7-3-2.7-1.6 0-2.8 1-3 2.5h-3.6c.3-3.4 3-5.8 6.7-5.8 3.9 0 6.7 2.5 6.7 5.8 0 1.4-.5 2.6-1.3 3.5l3.2 1.1-2.8 2.2c.2.8.3 1.7.3 2.7 0 5.3-4.1 9-10 9-5.2 0-6.2-3.4-6.2-7z' fill='%23090d16'/%3E%3Ccircle cx='24' cy='13.2' r='1.3' fill='%23fbbf24'/%3E%3C/svg%3E">
 <style>
-  :root{--bg:#090d16;--card:#111827;--border:rgba(148,163,184,.16);--text:#f8fafc;--muted:#94a3b8;--accent:#f59e0b;--err:#f87171}
+  :root{--bg:#080b12;--surface:#0e131f;--inset:#0a0e17;--border:rgba(255,255,255,.08);--border-hi:rgba(255,255,255,.16);--text:#eef2f7;--muted:#7c8ba1;--accent:#f59e0b;--err:#f43f5e}
   *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
-    background:radial-gradient(800px circle at 20% 15%, rgba(245,158,11,.12), transparent 55%),
-               radial-gradient(700px circle at 85% 85%, rgba(56,189,248,.10), transparent 55%), var(--bg);
-    color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
-  .box{width:100%;max-width:380px;background:rgba(17,24,39,.88);backdrop-filter:blur(16px);
-    border:1px solid var(--border);border-radius:20px;padding:34px 30px;box-shadow:0 24px 60px rgba(0,0,0,.45)}
+  body{
+    margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
+    background:radial-gradient(700px circle at 25% 18%, rgba(245,158,11,.09), transparent 55%),
+               radial-gradient(650px circle at 80% 82%, rgba(56,189,248,.08), transparent 55%),
+               radial-gradient(rgba(148,163,184,.06) 1px, transparent 1px), var(--bg);
+    background-size:100% 100%, 100% 100%, 22px 22px;
+    color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .box{
+    width:100%;max-width:376px;background:rgba(14,19,31,.92);backdrop-filter:blur(16px);
+    border:1px solid var(--border-hi);border-radius:16px;padding:30px 28px;
+    box-shadow:0 24px 64px rgba(0,0,0,.55);
+    animation:cardIn .45s cubic-bezier(.16,1,.3,1);
+  }
+  @keyframes cardIn{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
   .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-  .logo{display:flex;align-items:center;gap:12px}
-  .logo svg{width:38px;height:38px}
-  .logo-title{font-size:24px;font-weight:700;letter-spacing:-.5px;background:linear-gradient(135deg,#fbbf24,#38bdf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-  .lang-btn{background:rgba(15,23,42,.8);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:8px;font-size:12px;cursor:pointer}
-  .sub{margin:0 0 24px;color:var(--muted);font-size:13px}
-  label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
-  input{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--border);background:rgba(15,23,42,.9);color:var(--text);font-size:14px;margin-bottom:16px;outline:none;transition:.15s}
-  input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(245,158,11,.15)}
-  button.submit{width:100%;padding:12px;border:none;border-radius:12px;background:linear-gradient(135deg,#f59e0b,#d97706);color:#090d16;font-size:14px;font-weight:700;cursor:pointer;transition:.15s}
-  button.submit:hover{filter:brightness(1.08);transform:translateY(-1px)}
-  .err{background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.3);color:var(--err);font-size:13px;padding:9px 12px;border-radius:10px;margin-bottom:14px}
-  .foot{margin-top:20px;text-align:center;font-size:12px;color:#64748b}
+  .logo{display:flex;align-items:center;gap:11px}
+  .logo svg{width:34px;height:34px}
+  .logo-title{font-size:21px;font-weight:700;letter-spacing:-.4px;color:var(--text)}
+  .lang-btn{background:var(--inset);border:1px solid var(--border);color:var(--muted);padding:4px 9px;border-radius:7px;font-size:11.5px;cursor:pointer;font-family:ui-monospace,Consolas,monospace}
+  .lang-btn:hover{border-color:var(--border-hi);color:var(--text)}
+  .sub{margin:0 0 22px;color:var(--muted);font-size:12.5px}
+  label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:6px;font-weight:500}
+  .pw-wrap{position:relative;margin-bottom:16px}
+  input{width:100%;padding:11px 40px 11px 13px;border-radius:10px;border:1px solid var(--border);background:var(--inset);color:var(--text);font-size:13.5px;outline:none;transition:.15s}
+  input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(245,158,11,.14)}
+  .eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;padding:4px;display:flex;align-items:center}
+  .eye:hover{color:var(--text)}
+  .eye svg{width:16px;height:16px}
+  button.submit{width:100%;padding:11px;border:none;border-radius:10px;background:var(--accent);color:#080b12;font-size:13.5px;font-weight:700;cursor:pointer;transition:.14s}
+  button.submit:hover{filter:brightness(1.08)}
+  button.submit:active{transform:scale(.98)}
+  .err{background:rgba(244,63,94,.12);border:1px solid rgba(244,63,94,.32);color:var(--err);font-size:12.5px;padding:9px 12px;border-radius:9px;margin-bottom:14px}
+  .foot{margin-top:18px;text-align:center;font-size:11px;color:#526077;font-family:ui-monospace,Consolas,monospace}
 </style>
 </head>
 <body>
@@ -33,8 +49,8 @@
   <div class="top">
     <div class="logo">
       <svg viewBox="0 0 40 40" fill="none">
-        <rect width="40" height="40" rx="12" fill="url(#g1)"/>
-        <path d="M12 24c0-5 3.5-8 8.5-8 2.6 0 4.5-1.4 4.5-3.3 0-1.6-1.3-2.7-3-2.7-1.6 0-2.8 1-3 2.5h-3.6c.3-3.4 3-5.8 6.7-5.8 3.9 0 6.7 2.5 6.7 5.8 0 1.4-.5 2.6-1.3 3.5l3.2 1.1-2.8 2.2c.2.8.3 1.7.3 2.7 0 5.3-4.1 9-10 9-5.2 0-6.2-3.4-6.2-7z" fill="#090d16"/>
+        <rect width="40" height="40" rx="11" fill="url(#g1)"/>
+        <path d="M12 24c0-5 3.5-8 8.5-8 2.6 0 4.5-1.4 4.5-3.3 0-1.6-1.3-2.7-3-2.7-1.6 0-2.8 1-3 2.5h-3.6c.3-3.4 3-5.8 6.7-5.8 3.9 0 6.7 2.5 6.7 5.8 0 1.4-.5 2.6-1.3 3.5l3.2 1.1-2.8 2.2c.2.8.3 1.7.3 2.7 0 5.3-4.1 9-10 9-5.2 0-6.2-3.4-6.2-7z" fill="#080b12"/>
         <circle cx="24" cy="13.2" r="1.3" fill="#fbbf24"/>
         <defs><linearGradient id="g1" x1="0" y1="0" x2="40" y2="40"><stop stop-color="#fbbf24"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
       </svg>
@@ -45,14 +61,19 @@
   <p class="sub" id="t-sub">by FanDuck · 本地安全隧道管理面板</p>
   __ERR__
   <label for="pw" id="t-lbl">面板密码</label>
-  <input id="pw" type="password" name="password" placeholder="请输入登录密码" required autofocus>
+  <div class="pw-wrap">
+    <input id="pw" type="password" name="password" placeholder="请输入登录密码" required autofocus>
+    <button type="button" class="eye" onclick="togglePw()" aria-label="Toggle password">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+    </button>
+  </div>
   <button type="submit" class="submit" id="t-btn">进入控制台</button>
-  <div class="foot">Local-First · Zero Third-Party Dependencies</div>
+  <div class="foot">LOCAL-FIRST · 127.0.0.1 · ZERO DEPENDENCIES</div>
 </form>
 <script>
 const L = {
   zh: { sub:'by FanDuck · 本地安全隧道管理面板', lbl:'面板密码', ph:'请输入登录密码', btn:'进入控制台', sw:'EN' },
-  en: { sub:'by FanDuck · Local-First Xray Panel', lbl:'Panel Password', ph:'Enter password', btn:'Sign In', sw:'中' }
+  en: { sub:'by FanDuck · Local-First Xray & sing-box Panel', lbl:'Panel Password', ph:'Enter password', btn:'Sign In', sw:'中' }
 };
 function applyLang(lang){
   const t = L[lang] || L.zh;
@@ -65,6 +86,10 @@ function applyLang(lang){
 function toggleLang(){
   const cur = (localStorage.getItem('quackui_lang') || 'zh') === 'zh' ? 'en' : 'zh';
   localStorage.setItem('quackui_lang', cur); applyLang(cur);
+}
+function togglePw(){
+  const i = document.getElementById('pw');
+  i.type = i.type === 'password' ? 'text' : 'password';
 }
 applyLang(localStorage.getItem('quackui_lang') || 'zh');
 </script>

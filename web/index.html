@@ -6,245 +6,490 @@
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='40' y2='40' gradientUnits='userSpaceOnUse'%3E%3Cstop stop-color='%23fbbf24'/%3E%3Cstop offset='1' stop-color='%2338bdf8'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='40' height='40' rx='12' fill='url(%23g)'/%3E%3Cpath d='M12 24c0-5 3.5-8 8.5-8 2.6 0 4.5-1.4 4.5-3.3 0-1.6-1.3-2.7-3-2.7-1.6 0-2.8 1-3 2.5h-3.6c.3-3.4 3-5.8 6.7-5.8 3.9 0 6.7 2.5 6.7 5.8 0 1.4-.5 2.6-1.3 3.5l3.2 1.1-2.8 2.2c.2.8.3 1.7.3 2.7 0 5.3-4.1 9-10 9-5.2 0-6.2-3.4-6.2-7z' fill='%23090d16'/%3E%3Ccircle cx='24' cy='13.2' r='1.3' fill='%23fbbf24'/%3E%3C/svg%3E">
 <style>
   :root{
-    --bg:#090d16;--bg2:#0f172a;--card:#111827;--card2:#0c1322;
-    --border:rgba(148,163,184,.14);--text:#f1f5f9;--muted:#94a3b8;
-    --accent:#f59e0b;--accent2:#38bdf8;--ok:#10b981;--warn:#f59e0b;--err:#ef4444;
-    --shadow:0 10px 30px rgba(0,0,0,.28);
+    --bg:#080b12;--surface:#0e131f;--elevated:#141b2b;--inset:#0a0e17;
+    --border:rgba(255,255,255,.075);--border-hi:rgba(255,255,255,.15);
+    --text:#eef2f7;--text2:#cbd5e1;--muted:#7c8ba1;
+    --accent:#f59e0b;--accent-dim:rgba(245,158,11,.13);
+    --blue:#38bdf8;--blue-dim:rgba(56,189,248,.13);
+    --purple:#a78bfa;--green:#10b981;--green-dim:rgba(16,185,129,.13);
+    --red:#f43f5e;--red-dim:rgba(244,63,94,.13);
+    --grid-dot:rgba(148,163,184,.06);
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 8px 24px rgba(0,0,0,.22);
+    --mono:ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Roboto,sans-serif;
   }
   [data-theme="light"]{
-    --bg:#f1f5f9;--bg2:#e2e8f0;--card:#ffffff;--card2:#f8fafc;
-    --border:rgba(15,23,42,.10);--text:#0f172a;--muted:#64748b;
-    --accent:#d97706;--accent2:#0284c7;--ok:#059669;--warn:#d97706;--err:#dc2626;
-    --shadow:0 6px 20px rgba(15,23,42,.06);
+    --bg:#f3f5f9;--surface:#ffffff;--elevated:#f8fafc;--inset:#f1f5f9;
+    --border:rgba(15,23,42,.08);--border-hi:rgba(15,23,42,.16);
+    --text:#0f172a;--text2:#334155;--muted:#64748b;
+    --accent:#d97706;--accent-dim:rgba(217,119,6,.10);
+    --blue:#0284c7;--blue-dim:rgba(2,132,199,.10);
+    --purple:#7c3aed;--green:#059669;--green-dim:rgba(5,150,105,.10);
+    --red:#e11d48;--red-dim:rgba(225,29,72,.10);
+    --grid-dot:rgba(15,23,42,.04);
+    --shadow:0 1px 2px rgba(15,23,42,.05),0 6px 18px rgba(15,23,42,.04);
   }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;line-height:1.5;min-height:100vh}
+  body{
+    margin:0;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:13.5px;line-height:1.5;min-height:100vh;
+    background-image:radial-gradient(var(--grid-dot) 1px, transparent 1px);background-size:22px 22px;
+    -webkit-font-smoothing:antialiased;
+  }
   .layout{display:flex;min-height:100vh}
-  .sidebar{width:230px;background:var(--card);border-right:1px solid var(--border);padding:20px 14px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh}
-  .brand{display:flex;align-items:center;gap:10px;padding:4px 8px 18px;border-bottom:1px solid var(--border);margin-bottom:14px}
-  .brand svg{width:32px;height:32px}
-  .brand-name{font-size:19px;font-weight:700;letter-spacing:-.4px;background:linear-gradient(135deg,#fbbf24,#38bdf8);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-  .brand-sub{font-size:11px;color:var(--muted)}
-  .nav{display:flex;flex-direction:column;gap:4px;flex:1}
-  .nav button{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:none;border-radius:10px;background:transparent;color:var(--muted);font-size:13.5px;font-weight:500;cursor:pointer;text-align:left;transition:.15s}
-  .nav button:hover{background:var(--card2);color:var(--text)}
-  .nav button.active{background:rgba(245,158,11,.14);color:var(--accent);font-weight:600}
-  .side-foot{border-top:1px solid var(--border);padding-top:12px;display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)}
-  .main{flex:1;padding:24px 28px 56px;max-width:1200px;width:100%;margin:0 auto}
-  .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:22px}
-  .pills{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;border-radius:999px;background:var(--card);border:1px solid var(--border);color:var(--muted)}
-  .dot{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok)}
-  .dot.bad{background:var(--err);box-shadow:0 0 8px var(--err)}
+  /* Sidebar */
+  .sidebar{
+    width:236px;background:var(--surface);border-right:1px solid var(--border);
+    padding:18px 12px;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;flex-shrink:0;
+  }
+  .brand{display:flex;align-items:center;gap:11px;padding:4px 10px 16px;border-bottom:1px solid var(--border);margin-bottom:14px}
+  .brand svg{width:30px;height:30px;flex-shrink:0}
+  .brand-name{font-size:17px;font-weight:700;letter-spacing:-.4px;color:var(--text)}
+  .brand-meta{font-size:11px;color:var(--muted);font-family:var(--mono)}
+  .nav-group{font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:6px 10px 4px;margin-top:4px}
+  .nav{display:flex;flex-direction:column;gap:2px;flex:1}
+  .nav button{
+    display:flex;align-items:center;gap:10px;width:100%;padding:9px 11px;border:1px solid transparent;
+    border-radius:9px;background:transparent;color:var(--muted);font-size:13px;font-weight:500;
+    cursor:pointer;text-align:left;transition:.14s;position:relative;
+  }
+  .nav button svg{width:16px;height:16px;stroke-width:1.8;flex-shrink:0}
+  .nav button:hover{background:var(--elevated);color:var(--text)}
+  .nav button.active{background:var(--accent-dim);color:var(--accent);border-color:rgba(245,158,11,.22);font-weight:600}
+  .nav-badge{margin-left:auto;font-size:10.5px;font-family:var(--mono);padding:1px 6px;border-radius:999px;background:var(--inset);border:1px solid var(--border);color:var(--muted)}
+  .nav button.active .nav-badge{background:rgba(245,158,11,.2);border-color:rgba(245,158,11,.35);color:var(--accent)}
+  .rename-btn{background:none;border:none;color:var(--muted);cursor:pointer;padding:2px 5px;border-radius:5px;font-size:12px;line-height:1}
+  .rename-btn:hover{color:var(--accent);background:var(--inset)}
+  .side-foot{border-top:1px solid var(--border);padding:12px 10px 2px;font-size:11.5px;color:var(--muted);font-family:var(--mono);display:flex;flex-direction:column;gap:4px}
+  .side-foot .live{display:flex;align-items:center;gap:6px;color:var(--text2)}
+
+  /* Main */
+  .main{flex:1;padding:22px 28px 60px;max-width:1240px;width:100%;margin:0 auto}
+  .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:22px;padding-bottom:14px;border-bottom:1px solid var(--border)}
+  .page-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .page-title{font-size:17px;font-weight:700;letter-spacing:-.3px;margin:0}
+  .status-strip{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;padding:4px 9px;border-radius:7px;background:var(--surface);border:1px solid var(--border);color:var(--muted);font-family:var(--mono)}
+  .pill b{color:var(--text2);font-weight:600}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+  .dot.bad{background:var(--red);box-shadow:0 0 8px var(--red)}
+  .top-actions{display:flex;gap:6px;align-items:center}
+
+  /* Layout & Cards */
   .tab-pane{display:none}.tab-pane.active{display:block}
-  .grid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:16px}
-  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 20px;box-shadow:var(--shadow);margin-bottom:16px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:16px}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow);margin-bottom:14px}
   .grid4 .card,.grid2 .card{margin-bottom:0}
-  .card-title{margin:0 0 14px;font-size:14.5px;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
-  .k{font-size:12px;color:var(--muted);margin-bottom:6px}
-  .v{font-size:22px;font-weight:700;letter-spacing:-.4px}
-  .sub{font-size:12px;color:var(--muted);margin-top:4px}
-  .bar{height:6px;background:var(--bg2);border-radius:999px;overflow:hidden;margin-top:9px}
-  .bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .35s}
-  .node-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:18px 20px;margin-bottom:14px;box-shadow:var(--shadow)}
-  .node-card.off{opacity:.62}
-  .node-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border)}
-  .node-tags{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-  .tag{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--card2);border:1px solid var(--border);color:var(--muted)}
-  .tag.ok{background:rgba(16,185,129,.14);border-color:rgba(16,185,129,.35);color:var(--ok)}
-  .tag.accent{background:rgba(56,189,248,.14);border-color:rgba(56,189,248,.35);color:var(--accent2)}
-  .kv{display:grid;grid-template-columns:105px 1fr;gap:8px 12px;font-size:13px;align-items:center}
-  .kv .lbl{color:var(--muted)}
-  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-all;background:var(--card2);padding:5px 9px;border-radius:8px;border:1px solid var(--border);font-size:12px;cursor:pointer}
-  .mono:hover{border-color:var(--accent)}
-  .btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-  button.btn,a.btn{padding:7px 13px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:12.5px;font-weight:500;cursor:pointer;transition:.15s;text-decoration:none;display:inline-flex;align-items:center;gap:5px}
-  button.btn:hover,a.btn:hover{border-color:var(--accent2)}
-  button.primary{background:linear-gradient(135deg,#f59e0b,#d97706);border-color:transparent;color:#090d16;font-weight:700}
-  button.info{background:rgba(56,189,248,.14);border-color:rgba(56,189,248,.35);color:var(--accent2)}
-  button.warn{background:rgba(245,158,11,.14);border-color:rgba(245,158,11,.35);color:var(--accent)}
-  button.danger{background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.35);color:var(--err)}
+  .card-title{margin:0 0 12px;font-size:13.5px;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;color:var(--text)}
+  .k{font-size:11.5px;color:var(--muted);font-weight:500;display:flex;justify-content:space-between;align-items:center}
+  .v{font-size:22px;font-weight:700;letter-spacing:-.5px;margin-top:6px;font-variant-numeric:tabular-nums;font-family:var(--mono)}
+  .sub{font-size:12px;color:var(--muted);margin-top:4px;font-variant-numeric:tabular-nums}
+  .bar{height:4px;background:var(--inset);border-radius:999px;overflow:hidden;margin-top:10px}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--blue));transition:width .35s}
+
+  /* Buttons & Inputs */
+  .btns{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}
+  button.btn,a.btn{
+    padding:7px 12px;border-radius:8px;border:1px solid var(--border);background:var(--elevated);
+    color:var(--text2);font-size:12.5px;font-weight:500;cursor:pointer;transition:.14s;
+    text-decoration:none;display:inline-flex;align-items:center;gap:6px;font-family:var(--sans);
+  }
+  button.btn svg,a.btn svg{width:14px;height:14px;stroke-width:1.9;flex-shrink:0}
+  button.btn:hover,a.btn:hover{border-color:var(--border-hi);color:var(--text);background:var(--surface)}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#090b10;font-weight:600}
+  button.primary:hover{filter:brightness(1.08);background:var(--accent);color:#090b10}
+  button.info{background:var(--blue-dim);border-color:rgba(56,189,248,.3);color:var(--blue)}
+  button.warn{background:var(--accent-dim);border-color:rgba(245,158,11,.3);color:var(--accent)}
+  button.danger{background:var(--red-dim);border-color:rgba(244,63,94,.3);color:var(--red)}
   .row{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center}
-  .row input,.row select{flex:1;min-width:160px;padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:13px;outline:none}
-  .row input:focus,.row select:focus{border-color:var(--accent)}
-  .switch-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+  .row input,.row select{
+    flex:1;min-width:150px;padding:8px 11px;border-radius:8px;border:1px solid var(--border);
+    background:var(--inset);color:var(--text);font-size:13px;outline:none;font-family:var(--sans);
+  }
+  .row input:focus,.row select:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}
+  .field-lbl{font-size:11.5px;color:var(--muted);margin:10px 0 4px;font-weight:500}
+
+  /* Node Cards (Industrial left accent stripe) */
+  .node-card{
+    background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--accent);
+    border-radius:12px;padding:16px 18px;margin-bottom:12px;box-shadow:var(--shadow);transition:.15s;
+  }
+  .node-card.proto-vmess{border-left-color:var(--blue)}
+  .node-card.proto-trojan{border-left-color:var(--purple)}
+  .node-card.proto-shadowsocks{border-left-color:var(--green)}
+  .node-card.proto-anytls{border-left-color:var(--red)}
+  .node-card.proto-hysteria2{border-left-color:#14b8a6}
+  .node-card.proto-tuic{border-left-color:#6366f1}
+  .node-card.off{opacity:.58;border-left-color:var(--muted)}
+  .node-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--border)}
+  .node-name{font-size:14.5px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px}
+  .node-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+  .tag{font-size:11px;padding:2px 8px;border-radius:6px;background:var(--inset);border:1px solid var(--border);color:var(--muted);font-family:var(--mono)}
+  .tag.ok{background:var(--green-dim);border-color:rgba(16,185,129,.3);color:var(--green)}
+  .tag.accent{background:var(--blue-dim);border-color:rgba(56,189,248,.3);color:var(--blue)}
+  .kv{display:grid;grid-template-columns:100px 1fr;gap:7px 12px;font-size:12.5px;align-items:center}
+  .kv .lbl{color:var(--muted)}
+  .mono{font-family:var(--mono);word-break:break-all;background:var(--inset);padding:5px 9px;border-radius:7px;border:1px solid var(--border);font-size:12px;cursor:pointer;color:var(--text2);transition:.12s}
+  .mono:hover{border-color:var(--accent);color:var(--text)}
+
+  /* Presets Grid in Node Builder */
+  .presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:7px;margin-bottom:14px}
+  .preset{
+    padding:9px 10px;border-radius:9px;border:1px solid var(--border);background:var(--inset);
+    cursor:pointer;text-align:left;transition:.14s;color:var(--text);
+  }
+  .preset:hover,.preset.sel{border-color:var(--accent);background:var(--accent-dim)}
+  .preset b{display:block;font-size:12px;margin-bottom:2px}
+  .preset span{font-size:11px;color:var(--muted)}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+  .chip{font-size:11px;padding:2px 8px;border-radius:6px;background:var(--inset);border:1px solid var(--border);color:var(--muted);cursor:pointer;font-family:var(--mono)}
+  .chip:hover{border-color:var(--accent);color:var(--text)}
+
+  /* Switches, Logs, Charts, Modals */
+  .switch-row{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--border);gap:12px}
   .switch-row:last-child{border-bottom:none}
-  .switch{position:relative;display:inline-block;width:44px;height:24px;flex-shrink:0}
+  .switch{position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0}
   .switch input{opacity:0;width:0;height:0}
-  .slider{position:absolute;inset:0;background:var(--bg2);border:1px solid var(--border);border-radius:999px;cursor:pointer;transition:.2s}
-  .slider:before{content:"";position:absolute;height:18px;width:18px;left:2px;bottom:2px;background:#fff;border-radius:50%;transition:.2s}
+  .slider{position:absolute;inset:0;background:var(--inset);border:1px solid var(--border-hi);border-radius:999px;cursor:pointer;transition:.2s}
+  .slider:before{content:"";position:absolute;height:16px;width:16px;left:2px;bottom:2px;background:var(--muted);border-radius:50%;transition:.2s}
   input:checked+.slider{background:var(--accent);border-color:var(--accent)}
-  input:checked+.slider:before{transform:translateX(20px)}
-  .log-tabs{display:flex;gap:8px;flex-wrap:wrap}
-  .log-tabs button.active{background:rgba(56,189,248,.15);border-color:var(--accent2);color:var(--accent2)}
-  pre{margin:0;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:14px;font-size:12px;color:var(--muted);max-height:420px;overflow:auto;white-space:pre-wrap;word-break:break-all;font-family:ui-monospace,Consolas,monospace}
+  input:checked+.slider:before{transform:translateX(18px);background:#090b10}
+  .log-tabs{display:flex;gap:6px;flex-wrap:wrap}
+  .log-tabs button.active{background:var(--blue-dim);border-color:rgba(56,189,248,.35);color:var(--blue)}
+  pre{margin:0;background:var(--inset);border:1px solid var(--border);border-radius:10px;padding:14px;font-size:12px;color:var(--text2);max-height:440px;overflow:auto;white-space:pre-wrap;word-break:break-all;font-family:var(--mono)}
   canvas.chart{width:100%;height:175px;display:block}
-  .check-res{margin-top:12px;padding:10px 14px;border-radius:10px;background:var(--card2);border:1px solid var(--border);font-size:13px;display:none}
-  .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.62);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;padding:16px;z-index:80}
+  .check-res{margin-top:12px;padding:10px 13px;border-radius:9px;background:var(--inset);border:1px solid var(--border);font-size:12.5px;display:none}
+  .modal-bg{position:fixed;inset:0;background:rgba(4,6,12,.72);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;padding:16px;z-index:80}
   .modal-bg.open{display:flex}
-  .modal{width:100%;max-width:460px;background:var(--card);border:1px solid var(--border);border-radius:18px;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.5)}
-  .modal h3{margin:0 0 14px;font-size:16px;display:flex;justify-content:space-between;align-items:center}
-  .qr-box{background:#fff;padding:16px;border-radius:14px;display:flex;justify-content:center;max-width:230px;margin:10px auto}
-  .qr-box svg{width:196px;height:196px;display:block}
-  .toast{position:fixed;right:22px;bottom:22px;background:var(--card);border:1px solid var(--accent);color:var(--text);padding:11px 16px;border-radius:12px;font-size:13px;display:none;z-index:99;box-shadow:0 12px 32px rgba(0,0,0,.35)}
-  @media(max-width:880px){
+  .modal{width:100%;max-width:560px;max-height:92vh;overflow-y:auto;background:var(--surface);border:1px solid var(--border-hi);border-radius:14px;padding:20px 22px;box-shadow:0 24px 64px rgba(0,0,0,.55)}
+  .modal h3{margin:0 0 14px;font-size:15px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+  .qr-box{background:#fff;padding:16px;border-radius:12px;display:flex;justify-content:center;max-width:228px;margin:10px auto}
+  .qr-box svg{width:194px;height:194px;display:block}
+  .diag-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:9px 12px;border-radius:9px;background:var(--inset);border:1px solid var(--border);margin-bottom:7px;font-size:12.5px}
+  .diag-probes{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+  .probe-chip{font-size:11.5px;padding:6px 8px;border-radius:7px;background:var(--surface);border:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:6px;font-family:var(--mono)}
+  .gfw-banner{padding:12px 14px;border-radius:10px;margin-bottom:10px;font-size:12.5px;border:1px solid var(--border)}
+  .gfw-banner.ok{background:var(--green-dim);border-color:rgba(16,185,129,.35);color:var(--green)}
+  .gfw-banner.warn{background:var(--accent-dim);border-color:rgba(245,158,11,.35);color:var(--accent)}
+  .gfw-banner.blocked{background:var(--red-dim);border-color:rgba(244,63,94,.4);color:var(--red)}
+  .gfw-banner.unknown{background:var(--inset);color:var(--muted)}
+  .toast{position:fixed;right:20px;bottom:20px;background:var(--elevated);border:1px solid var(--accent);color:var(--text);padding:10px 15px;border-radius:10px;font-size:12.5px;display:none;z-index:99;box-shadow:0 12px 32px rgba(0,0,0,.4)}
+
+  /* Interactive Boot Splash & Staggered Entrance */
+  #boot-splash{
+    position:fixed;inset:0;z-index:200;background:var(--bg);
+    background-image:radial-gradient(600px circle at 50% 45%, rgba(245,158,11,.10), transparent 60%), radial-gradient(var(--grid-dot) 1px, transparent 1px);
+    background-size:100% 100%, 22px 22px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;
+    transition:opacity .48s cubic-bezier(.16,1,.3,1), transform .48s cubic-bezier(.16,1,.3,1);
+    cursor:pointer;
+  }
+  #boot-splash.hide{opacity:0;transform:scale(1.03);pointer-events:none}
+  .boot-ring{position:relative;width:76px;height:76px;display:flex;align-items:center;justify-content:center}
+  .boot-ring::before{
+    content:"";position:absolute;inset:0;border-radius:22px;padding:2px;
+    background:conic-gradient(from 0deg, var(--accent), var(--blue), transparent 65%, var(--accent));
+    -webkit-mask:linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite:xor;mask-composite:exclude;
+    animation:spin 1.4s linear infinite;
+  }
+  .boot-ring svg{width:46px;height:46px;filter:drop-shadow(0 0 14px rgba(245,158,11,.35));animation:pulseLogo .9s ease-out}
+  .boot-title{font-size:20px;font-weight:700;letter-spacing:.02em;color:var(--text)}
+  .boot-bar{width:210px;height:3px;background:var(--elevated);border-radius:999px;overflow:hidden}
+  .boot-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--blue));animation:bootFill .82s cubic-bezier(.22,1,.36,1) forwards}
+  .boot-status{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.08em}
+
+  body.entering .sidebar{opacity:0;transform:translateX(-16px)}
+  body.entered .sidebar{opacity:1;transform:none;transition:opacity .45s ease, transform .45s cubic-bezier(.16,1,.3,1)}
+  body.entering .stagger{opacity:0;transform:translateY(14px)}
+  body.entered .stagger{opacity:1;transform:none;transition:opacity .45s ease var(--d,0ms), transform .5s cubic-bezier(.16,1,.3,1) var(--d,0ms)}
+  .tab-pane.active{animation:paneIn .28s cubic-bezier(.16,1,.3,1)}
+  button.btn:active,a.btn:active{transform:scale(.97)}
+
+  /* Interactive Spotlight Hover on Cards */
+  .card,.node-card{position:relative;overflow:hidden}
+  .card::after,.node-card::after{
+    content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .25s;
+    background:radial-gradient(280px circle at var(--mx,50%) var(--my,50%), rgba(245,158,11,.07), transparent 65%);
+  }
+  .card:hover::after,.node-card:hover::after{opacity:1}
+
+  /* Live Streaming 5D Diagnostic UI */
+  .diag-prog{height:4px;background:var(--inset);border-radius:999px;overflow:hidden;margin-bottom:12px}
+  .diag-prog i{display:block;height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--blue));transition:width .35s ease}
+  .diag-step{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;background:var(--inset);border:1px solid var(--border);margin-bottom:7px;font-size:12.5px;transition:border-color .2s, background .2s}
+  .diag-step.running{border-color:rgba(56,189,248,.5);background:var(--blue-dim)}
+  .diag-step.ok{border-color:rgba(16,185,129,.35)}
+  .diag-step.warn{border-color:rgba(245,158,11,.4)}
+  .diag-step.fail{border-color:rgba(244,63,94,.45);background:var(--red-dim)}
+  .diag-left{display:flex;align-items:center;gap:9px}
+  .step-dot{width:14px;height:14px;border-radius:50%;border:2px solid var(--border-hi);flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:9px;font-weight:700}
+  .diag-step.running .step-dot{border-color:var(--blue);border-top-color:transparent;animation:spin .75s linear infinite}
+  .diag-step.ok .step-dot{border-color:var(--green);background:var(--green);color:#080b12}
+  .diag-step.warn .step-dot{border-color:var(--accent);background:var(--accent);color:#080b12}
+  .diag-step.fail .step-dot{border-color:var(--red);background:var(--red);color:#fff}
+  .diag-log{margin-top:10px;background:#060910;border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-family:var(--mono);font-size:11.5px;color:#94a3b8;max-height:145px;overflow-y:auto;line-height:1.65}
+  .diag-log div{animation:paneIn .2s ease}
+
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes bootFill{0%{width:0}45%{width:58%}100%{width:100%}}
+  @keyframes pulseLogo{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
+  @keyframes paneIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  @media(max-width:1024px){.grid4{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:860px){
     .layout{flex-direction:column}
-    .sidebar{width:100%;height:auto;position:static;border-right:none;border-bottom:1px solid var(--border);padding:14px}
+    .sidebar{width:100%;height:auto;position:static;border-right:none;border-bottom:1px solid var(--border);padding:12px}
+    .nav-group,.side-foot{display:none}
     .nav{flex-direction:row;overflow-x:auto}.nav button{white-space:nowrap}
-    .side-foot{display:none}
     .main{padding:16px}
-    .grid2{grid-template-columns:1fr}
+    .grid2,.grid4{grid-template-columns:1fr}
   }
 </style>
 </head>
-<body>
+<body class="entering">
+<!-- Interactive Boot Splash -->
+<div id="boot-splash" onclick="finishBoot()">
+  <div class="boot-ring">
+    <svg viewBox="0 0 40 40" fill="none">
+      <rect width="40" height="40" rx="11" fill="url(#gb)"/>
+      <path d="M12 24c0-5 3.5-8 8.5-8 2.6 0 4.5-1.4 4.5-3.3 0-1.6-1.3-2.7-3-2.7-1.6 0-2.8 1-3 2.5h-3.6c.3-3.4 3-5.8 6.7-5.8 3.9 0 6.7 2.5 6.7 5.8 0 1.4-.5 2.6-1.3 3.5l3.2 1.1-2.8 2.2c.2.8.3 1.7.3 2.7 0 5.3-4.1 9-10 9-5.2 0-6.2-3.4-6.2-7z" fill="#080b12"/>
+      <circle cx="24" cy="13.2" r="1.3" fill="#fbbf24"/>
+      <defs><linearGradient id="gb" x1="0" y1="0" x2="40" y2="40"><stop stop-color="#fbbf24"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
+    </svg>
+  </div>
+  <div class="boot-title">QuackUI</div>
+  <div class="boot-bar"><i></i></div>
+  <div class="boot-status" id="boot-status">INITIALIZING QUACKUI KERNEL...</div>
+</div>
 <div class="layout">
   <aside class="sidebar">
     <div class="brand">
       <svg viewBox="0 0 40 40" fill="none">
-        <rect width="40" height="40" rx="12" fill="url(#g2)"/>
-        <path d="M12 24c0-5 3.5-8 8.5-8 2.6 0 4.5-1.4 4.5-3.3 0-1.6-1.3-2.7-3-2.7-1.6 0-2.8 1-3 2.5h-3.6c.3-3.4 3-5.8 6.7-5.8 3.9 0 6.7 2.5 6.7 5.8 0 1.4-.5 2.6-1.3 3.5l3.2 1.1-2.8 2.2c.2.8.3 1.7.3 2.7 0 5.3-4.1 9-10 9-5.2 0-6.2-3.4-6.2-7z" fill="#090d16"/>
+        <rect width="40" height="40" rx="11" fill="url(#g2)"/>
+        <path d="M12 24c0-5 3.5-8 8.5-8 2.6 0 4.5-1.4 4.5-3.3 0-1.6-1.3-2.7-3-2.7-1.6 0-2.8 1-3 2.5h-3.6c.3-3.4 3-5.8 6.7-5.8 3.9 0 6.7 2.5 6.7 5.8 0 1.4-.5 2.6-1.3 3.5l3.2 1.1-2.8 2.2c.2.8.3 1.7.3 2.7 0 5.3-4.1 9-10 9-5.2 0-6.2-3.4-6.2-7z" fill="#080b12"/>
         <circle cx="24" cy="13.2" r="1.3" fill="#fbbf24"/>
         <defs><linearGradient id="g2" x1="0" y1="0" x2="40" y2="40"><stop stop-color="#fbbf24"/><stop offset="1" stop-color="#38bdf8"/></linearGradient></defs>
       </svg>
       <div>
         <div class="brand-name">QuackUI</div>
-        <div class="brand-sub">by FanDuck · v<span id="ver">2.0.0</span></div>
+        <div class="brand-meta">v<span id="ver">2.3.5</span> · FanDuck</div>
       </div>
     </div>
+
+    <div class="nav-group">Console</div>
     <nav class="nav">
-      <button class="active" onclick="switchTab('dash',this)" data-i18n="nav_dash">📊 仪表盘</button>
-      <button onclick="switchTab('nodes',this)" data-i18n="nav_nodes">🚀 节点管理</button>
-      <button onclick="switchTab('routing',this)" data-i18n="nav_routing">🧭 路由与出站</button>
-      <button onclick="switchTab('logs',this)" data-i18n="nav_logs">📜 系统日志</button>
-      <button onclick="switchTab('settings',this)" data-i18n="nav_settings">⚙️ 设置与备份</button>
+      <button class="active" onclick="switchTab('dash',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+        <span data-i18n="nav_dash">概览仪表盘</span>
+      </button>
+      <button onclick="switchTab('nodes',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="2" y="4" width="20" height="6" rx="2"/><rect x="2" y="14" width="20" height="6" rx="2"/><circle cx="6" cy="7" r="1" fill="currentColor"/><circle cx="6" cy="17" r="1" fill="currentColor"/></svg>
+        <span data-i18n="nav_nodes">节点与协议</span>
+        <span class="nav-badge" id="nav-node-cnt">0</span>
+      </button>
+      <button onclick="switchTab('routing',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><path d="M9 6h5a4 4 0 0 1 4 4v5"/><path d="M6 9v6a4 4 0 0 0 4 4h5"/></svg>
+        <span data-i18n="nav_routing">路由与家宽</span>
+      </button>
+      <button onclick="switchTab('logs',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        <span data-i18n="nav_logs">系统日志</span>
+      </button>
+      <button onclick="switchTab('settings',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        <span data-i18n="nav_settings">内核与设置</span>
+      </button>
     </nav>
+
     <div class="side-foot">
-      <div>Xray Core <span id="xray-ver">-</span></div>
-      <div>Local-First · 127.0.0.1</div>
+      <div class="live"><i class="dot"></i><span>Xray <b id="xray-ver">-</b></span></div>
+      <div class="live"><i class="dot" id="dot-sb-side"></i><span>sing-box <b id="sb-ver">-</b></span></div>
+      <div>Bind 127.0.0.1:8088</div>
     </div>
   </aside>
 
   <main class="main">
     <div class="topbar">
-      <div class="pills">
-        <span class="pill"><i id="dot-xray" class="dot"></i>Xray <b id="st-xray">-</b></span>
-        <span class="pill"><i id="dot-nft" class="dot"></i><span data-i18n="fw">防火墙</span> <b id="st-nft">-</b></span>
-        <span class="pill"><i id="dot-f2b" class="dot"></i>Fail2ban <b id="st-f2b">-</b></span>
-        <span class="pill"><span data-i18n="uptime">在线</span> <b id="uptime">-</b></span>
+      <div class="page-head">
+        <h1 class="page-title" id="page-title" data-i18n="nav_dash">概览仪表盘</h1>
+        <div class="status-strip">
+          <span class="pill"><i id="dot-xray" class="dot"></i>Xray <b id="st-xray">-</b></span>
+          <span class="pill"><i id="dot-nft" class="dot"></i><span data-i18n="fw">防火墙</span> <b id="st-nft">-</b></span>
+          <span class="pill"><i id="dot-f2b" class="dot"></i>Fail2ban <b id="st-f2b">-</b></span>
+          <span class="pill"><span data-i18n="uptime">在线</span> <b id="uptime">-</b></span>
+        </div>
       </div>
-      <div style="display:flex;gap:8px">
+      <div class="top-actions">
         <button class="btn" onclick="toggleLang()" id="lang-btn">EN</button>
-        <button class="btn" onclick="toggleTheme()" id="theme-btn">☀️ 浅色</button>
+        <button class="btn" onclick="toggleTheme()" id="theme-btn">浅色</button>
         <a class="btn" href="/logout" data-i18n="logout">退出</a>
       </div>
     </div>
 
     <!-- Dashboard -->
     <section id="tab-dash" class="tab-pane active">
+      <div class="card stagger" style="--d:10ms;padding:11px 16px;margin-bottom:14px">
+        <div class="status-strip" style="justify-content:space-between;width:100%">
+          <div class="status-strip">
+            <span class="pill">OS <b id="sys-os">-</b></span>
+            <span class="pill">Kernel <b id="sys-kern">-</b></span>
+            <span class="pill">TCP <b id="sys-bbr" style="color:var(--green)">-</b></span>
+          </div>
+          <div class="status-strip">
+            <span class="pill" style="cursor:pointer" onclick="copyText(document.getElementById('sys-v4').textContent)">IPv4 <b id="sys-v4">-</b></span>
+            <span class="pill" style="cursor:pointer" onclick="copyText(document.getElementById('sys-v6').textContent)">IPv6 <b id="sys-v6">-</b></span>
+          </div>
+        </div>
+      </div>
+
       <div class="grid4">
-        <div class="card">
-          <div class="k" data-i18n="kpi_today">今日流量 / 本月累计</div>
+        <div class="card stagger" style="--d:40ms">
+          <div class="k"><span data-i18n="kpi_today">今日流量 / 本月累计</span></div>
           <div class="v" id="tr-today">-</div>
           <div class="sub" id="tr-month">-</div>
         </div>
-        <div class="card">
-          <div class="k" data-i18n="kpi_rate">实时下载速率</div>
+        <div class="card stagger" style="--d:90ms">
+          <div class="k"><span data-i18n="kpi_rate">实时下载速率</span></div>
           <div class="v" id="tr-rate">-</div>
           <div class="sub" id="active-conns">-</div>
         </div>
-        <div class="card">
-          <div class="k" data-i18n="kpi_mem">内存 / CPU 负载</div>
+        <div class="card stagger" style="--d:140ms">
+          <div class="k"><span data-i18n="kpi_mem">内存 / CPU 负载</span></div>
           <div class="v" id="mem-val">-</div>
           <div class="bar"><i id="mem-bar" style="width:0%"></i></div>
           <div class="sub" id="cpu-load">-</div>
         </div>
-        <div class="card">
-          <div class="k" data-i18n="kpi_sec">SSH 防爆破 / 磁盘</div>
+        <div class="card stagger" style="--d:190ms">
+          <div class="k"><span data-i18n="kpi_sec">SSH 防爆破 / 磁盘</span></div>
           <div class="v" id="f2b-tot">-</div>
           <div class="sub" id="disk-val">-</div>
         </div>
       </div>
 
       <div class="grid2">
-        <div class="card">
+        <div class="card stagger" style="--d:230ms">
           <div class="card-title">
-            <span data-i18n="chart_live">实时速率趋势（5秒）</span>
-            <span class="sub"><span style="color:#38bdf8">●</span> ↓ &nbsp; <span style="color:#f59e0b">●</span> ↑</span>
+            <span data-i18n="chart_live">实时速率趋势（5s）</span>
+            <span class="sub"><span style="color:var(--blue)">●</span> RX &nbsp; <span style="color:var(--accent)">●</span> TX</span>
           </div>
           <canvas id="chart-live" class="chart"></canvas>
         </div>
-        <div class="card">
+        <div class="card stagger" style="--d:270ms">
           <div class="card-title">
-            <span data-i18n="chart_daily">近 14 天持久化流量（SQLite）</span>
+            <span data-i18n="chart_daily">近 14 天持久化流量</span>
             <span class="sub" id="tr-total">-</span>
           </div>
           <canvas id="chart-daily" class="chart"></canvas>
         </div>
       </div>
 
-      <div class="card">
+      <div class="card stagger" style="--d:310ms">
         <div class="card-title">
-          <span data-i18n="quick_ops">快捷运维</span>
+          <span data-i18n="quick_ops">快捷操作</span>
           <span class="sub" id="dash-summary">-</span>
         </div>
         <div class="btns" style="margin-top:0">
-          <button class="btn primary" onclick="openAddModal()" data-i18n="btn_add_node">➕ 新增节点</button>
-          <button class="btn info" onclick="selfCheck('reality-in')" data-i18n="btn_check">🩺 主节点一键自检</button>
-          <button class="btn" onclick="doPost('/api/restart-xray',{},T('confirm_restart'))" data-i18n="btn_restart">♻️ 重启 Xray</button>
-          <a class="btn" href="/api/backup" data-i18n="btn_backup">💾 一键下载配置备份</a>
+          <button class="btn primary" onclick="openAddModal()" data-i18n="btn_add_node">+ 新建 / 搭配节点</button>
+          <button class="btn info" onclick="openSubModal()">一键导出聚合订阅</button>
+          <button class="btn info" onclick="selfCheck('reality-in')" data-i18n="btn_check">节点五维体检 &amp; GFW 检测</button>
+          <button class="btn" onclick="doPost('/api/restart-xray',{},T('confirm_restart'))" data-i18n="btn_restart">重启 Xray</button>
+          <a class="btn" href="/api/backup" data-i18n="btn_backup">下载配置备份 (.tar.gz)</a>
         </div>
-        <div id="check-res" class="check-res"></div>
       </div>
     </section>
 
     <!-- Nodes -->
     <section id="tab-nodes" class="tab-pane">
-      <div class="card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+      <div class="card" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
         <div>
-          <b data-i18n="nodes_title">入站节点列表</b>
-          <div class="sub" data-i18n="nodes_sub">支持 VLESS + Vision + Reality、VLESS + XHTTP、VLESS + WS；点击任意参数即可复制</div>
+          <b data-i18n="nodes_title">入站节点管理</b>
+          <div class="sub" data-i18n="nodes_sub">支持 VLESS / VMess / Trojan / Shadowsocks-2022 自由组合（Reality / WS / XHTTP / gRPC），点击参数即可复制</div>
         </div>
-        <button class="btn primary" onclick="openAddModal()" data-i18n="btn_add_node">➕ 新增节点</button>
+        <div class="btns" style="margin-top:0">
+          <button class="btn info" onclick="openSubModal()">一键导出聚合订阅</button>
+          <button class="btn primary" onclick="openAddModal()" data-i18n="btn_add_node">+ 新建 / 搭配节点</button>
+        </div>
       </div>
       <div id="nodes-list"></div>
     </section>
 
-    <!-- Routing -->
+    <!-- Routing & Residential SOCKS5 -->
     <section id="tab-routing" class="tab-pane">
       <div class="card">
-        <div class="card-title"><span data-i18n="routing_title">路由规则与出站策略</span></div>
+        <div class="card-title">
+          <span data-i18n="s5_title">家宽 SOCKS5 出口路由（链式落地 IP）</span>
+          <span class="tag" id="s5-badge">未启用</span>
+        </div>
+        <p class="sub" style="margin-top:0" data-i18n="s5_sub">输入代理商提供的住宅 / 家宽 SOCKS5 账号密码，将出口路由至纯净家宽 IP（解锁 ChatGPT / Claude / TikTok / Netflix）。</p>
+        <div class="switch-row" style="padding-top:4px">
+          <div>
+            <b data-i18n="s5_enable">启用 SOCKS5 家宽出口</b>
+            <div class="sub" data-i18n="s5_enable_sub">关闭后立即恢复 VPS 原生直出</div>
+          </div>
+          <label class="switch"><input type="checkbox" id="s5-enabled"><span class="slider"></span></label>
+        </div>
+        <div class="row">
+          <input id="s5-quick" placeholder="快捷粘贴：ip:port:user:pass 或 socks5://user:pass@ip:port">
+          <button class="btn" onclick="parseSocks5Quick()">自动识别填入</button>
+        </div>
+        <div class="row">
+          <input id="s5-host" placeholder="SOCKS5 服务器地址 (IP / 域名)">
+          <input id="s5-port" type="number" value="1080" placeholder="端口" style="max-width:130px">
+        </div>
+        <div class="row">
+          <input id="s5-user" placeholder="用户名（无认证可留空）">
+          <input id="s5-pass" type="password" placeholder="密码（无认证可留空）">
+        </div>
+        <div class="row">
+          <select id="s5-mode" onchange="onS5ModeChange()">
+            <option value="all">全局出口走家宽 SOCKS5（除国内拦截外全部走家宽）</option>
+            <option value="ai_stream">AI &amp; 流媒体分流走家宽（ChatGPT / Claude / Gemini / Netflix / TikTok）</option>
+            <option value="custom">仅自定义域名走家宽</option>
+          </select>
+        </div>
+        <div class="row" id="s5-domains-row" style="display:none">
+          <input id="s5-domains" placeholder="附加或自定义域名，逗号分隔，如 openai.com, claude.ai">
+        </div>
+        <div class="btns">
+          <button class="btn info" onclick="testSocks5()" data-i18n="btn_s5_test">测试连通性与落地 IP</button>
+          <button class="btn primary" onclick="saveSocks5()" data-i18n="btn_s5_save">保存并应用家宽路由</button>
+        </div>
+        <div id="s5-test-res" class="check-res"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span data-i18n="routing_title">基础路由规则与出站策略</span></div>
         <div class="switch-row">
           <div>
-            <b data-i18n="r_cn">拦截中国大陆网站与 IP（防回国绕路特征）</b>
-            <div class="sub" data-i18n="r_cn_sub">geosite:cn / geoip:cn → block（强烈建议开启，防止客户端分流失效暴露）</div>
+            <b data-i18n="r_cn">拦截中国大陆网站与 IP</b>
+            <div class="sub" data-i18n="r_cn_sub">geosite:cn / geoip:cn → block（强烈建议开启，防止回国绕路特征）</div>
           </div>
           <label class="switch"><input type="checkbox" id="sw-cn"><span class="slider"></span></label>
         </div>
         <div class="switch-row">
           <div>
-            <b data-i18n="r_bt">屏蔽 BitTorrent / P2P 下载</b>
-            <div class="sub" data-i18n="r_bt_sub">防止 BT 流量引发机房版权投诉或封机</div>
+            <b data-i18n="r_bt">屏蔽 BitTorrent / P2P</b>
+            <div class="sub" data-i18n="r_bt_sub">防止 BT 流量引发机房投诉</div>
           </div>
           <label class="switch"><input type="checkbox" id="sw-bt"><span class="slider"></span></label>
         </div>
         <div class="switch-row">
           <div>
-            <b data-i18n="r_priv">屏蔽私有 / 局域网 IP 访问</b>
-            <div class="sub" data-i18n="r_priv_sub">geoip:private → block，防止 SSRF 探测内网</div>
+            <b data-i18n="r_priv">屏蔽私有 / 局域网 IP</b>
+            <div class="sub" data-i18n="r_priv_sub">geoip:private → block</div>
           </div>
           <label class="switch"><input type="checkbox" id="sw-priv"><span class="slider"></span></label>
         </div>
         <div class="switch-row">
           <div>
             <b data-i18n="r_out">出站 IP 优先级策略</b>
-            <div class="sub" data-i18n="r_out_sub">推荐仅 IPv4（UseIPv4），避免 VPS IPv6 触发 Google / ChatGPT 验证码</div>
+            <div class="sub" data-i18n="r_out_sub">推荐 UseIPv4，避免 VPS IPv6 触发验证码</div>
           </div>
-          <select id="sel-strategy" style="padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--card2);color:var(--text)">
+          <select id="sel-strategy" style="padding:7px 11px;border-radius:8px;border:1px solid var(--border);background:var(--inset);color:var(--text)">
             <option value="UseIPv4">UseIPv4（仅 IPv4 出站 · 推荐）</option>
-            <option value="UseIPv4v6">UseIPv4v6（IPv4 优先，双栈）</option>
-            <option value="UseIPv6v4">UseIPv6v4（IPv6 优先，双栈）</option>
+            <option value="UseIPv4v6">UseIPv4v6（IPv4 优先）</option>
+            <option value="UseIPv6v4">UseIPv6v4（IPv6 优先）</option>
             <option value="AsIs">AsIs（系统默认）</option>
           </select>
         </div>
@@ -260,6 +505,7 @@
         <div class="card-title">
           <div class="log-tabs">
             <button class="btn active" onclick="showLog('xray',this)">Xray</button>
+            <button class="btn" onclick="showLog('singbox',this)">sing-box</button>
             <button class="btn" onclick="showLog('fail2ban',this)">Fail2ban</button>
             <button class="btn" onclick="showLog('firewall',this)" data-i18n="fw">防火墙</button>
           </div>
@@ -271,88 +517,205 @@
 
     <!-- Settings -->
     <section id="tab-settings" class="tab-pane">
-      <div class="card">
-        <div class="card-title">
-          <span data-i18n="xray_mgr">🔧 Xray 内核版本管理</span>
-          <span class="sub">当前版本：<b id="xray-cur-ver">-</b></span>
+        <div class="card">
+          <div class="card-title">
+            <span data-i18n="xray_mgr">Xray 内核版本管理</span>
+            <span class="tag accent">当前 v<span id="xray-cur-ver">-</span></span>
+          </div>
+          <p class="sub" style="margin-top:0" data-i18n="xray_mgr_sub">支持升级至最新版或降级回退到任意历史版本；切换前自动备份旧二进制，若配置校验失败自动回滚。</p>
+          <div class="row">
+            <select id="xray-ver-sel"><option value="latest">最新正式版 (latest)</option></select>
+            <button class="btn" onclick="loadXrayReleases(true)" data-i18n="btn_refresh_ver">刷新版本列表</button>
+          </div>
+          <div class="btns">
+            <button class="btn primary" onclick="switchXrayVersion()" data-i18n="btn_switch_xray">切换 / 升级所选版本</button>
+            <button class="btn info" onclick="updateGeodata()" data-i18n="btn_geodata">更新 GeoIP / GeoSite</button>
+          </div>
+          <div id="xray-op-res" class="check-res"></div>
         </div>
-        <p class="sub" style="margin-top:0" data-i18n="xray_mgr_sub">支持升级到最新版本或随时降级回退到任意历史版本；切换前自动备份旧内核，若新版本与当前配置不兼容将自动回滚，防止断联。</p>
-        <div class="row">
-          <select id="xray-ver-sel">
-            <option value="latest">最新正式版 (latest)</option>
-          </select>
-          <button class="btn" onclick="loadXrayReleases(true)" data-i18n="btn_refresh_ver">刷新版本列表</button>
+
+        <div class="card">
+          <div class="card-title">
+            <span>sing-box 双引擎内核管理</span>
+            <span class="tag ok" id="sb-cur-tag">v<span id="sb-cur-ver">-</span></span>
+          </div>
+          <p class="sub" style="margin-top:0">用于驱动 <b>AnyTLS</b>、<b>Hysteria 2</b>（支持自动 UDP 端口跳跃）、<b>TUIC v5</b> 等新一代抗封锁协议；无 sing-box 节点时自动休眠零内存占用。</p>
+          <div class="btns">
+            <button class="btn primary" onclick="installSingbox()">一键安装 / 升级最新 sing-box</button>
+          </div>
+          <div id="sb-op-res" class="check-res"></div>
         </div>
-        <div class="btns">
-          <button class="btn primary" onclick="switchXrayVersion()" data-i18n="btn_switch_xray">⬆️ 切换 / 升级所选版本</button>
-          <button class="btn info" onclick="updateGeodata()" data-i18n="btn_geodata">🌍 更新 GeoIP / GeoSite</button>
+
+        <div class="card">
+          <div class="card-title">
+            <span>在线原始配置编辑器（JSON）</span>
+            <div class="log-tabs">
+              <button class="btn active" id="ed-btn-xray" onclick="loadRawCfg('xray',this)">Xray config.json</button>
+              <button class="btn" id="ed-btn-sb" onclick="loadRawCfg('singbox',this)">sing-box.json</button>
+            </div>
+          </div>
+          <p class="sub" style="margin-top:0">保存前自动校验 JSON 语法并执行 <code>xray run -test</code> / <code>sing-box check</code>，配置有误时自动拦截不会断联。</p>
+          <textarea id="raw-cfg-area" style="width:100%;min-height:240px;background:var(--inset);color:var(--text2);border:1px solid var(--border);border-radius:10px;padding:12px;font-family:var(--mono);font-size:12px;outline:none;resize:vertical"></textarea>
+          <div class="btns">
+            <button class="btn primary" onclick="saveRawCfg()">校验并保存生效</button>
+            <button class="btn" onclick="loadRawCfg(CUR_RAW_ENG)">重新加载</button>
+          </div>
         </div>
-        <div id="xray-op-res" class="check-res"></div>
-      </div>
 
       <div class="grid2">
         <div class="card">
-          <div class="card-title" data-i18n="set_pw">修改面板登录密码</div>
+          <div class="card-title" data-i18n="set_pw">修改面板密码</div>
           <div class="row"><input id="pw-old" type="password" placeholder="当前密码 / Current password"></div>
           <div class="row"><input id="pw-new" type="password" placeholder="新密码（至少 8 位） / New password"></div>
           <div class="row"><input id="pw-new2" type="password" placeholder="确认新密码 / Confirm password"></div>
-          <div class="btns">
-            <button class="btn primary" onclick="changePassword()" data-i18n="btn_save_pw">保存新密码</button>
-          </div>
+          <div class="btns"><button class="btn primary" onclick="changePassword()" data-i18n="btn_save_pw">保存新密码</button></div>
         </div>
         <div class="card">
           <div class="card-title" data-i18n="set_backup">备份与项目信息</div>
-          <p class="sub" style="font-size:13px;line-height:1.8">
-            <b>QuackUI v<span id="about-ver">2.0.1</span></b> · by FanDuck<br>
+          <p class="sub" style="font-size:12.5px;line-height:1.8;margin-top:0">
+            <b>QuackUI v<span id="about-ver">2.1.3</span></b> · by FanDuck<br>
             • Local-First：仅监听 <code>127.0.0.1:8088</code>，零公网暴露<br>
             • 零第三方 Python 依赖（纯标准库 + SQLite3）<br>
-            • 源码目录：<code>/opt/quackui/</code>（已含 <code>install.sh</code>、<code>README.md</code>、<code>.gitignore</code>）
+            • 源码目录：<code>/opt/quackui/</code>
           </p>
-          <div class="btns">
-            <a class="btn info" href="/api/backup" data-i18n="btn_backup">💾 一键下载配置备份 (.tar.gz)</a>
-          </div>
+          <div class="btns"><a class="btn info" href="/api/backup" data-i18n="btn_backup">下载配置备份 (.tar.gz)</a></div>
         </div>
       </div>
     </section>
   </main>
 </div>
 
-<!-- Add Node Modal -->
+<!-- Industrial Node Builder Modal -->
 <div class="modal-bg" id="modal-add">
   <div class="modal">
-    <h3><span data-i18n="btn_add_node">➕ 新增节点</span><button class="btn" onclick="closeModal('modal-add')">✕</button></h3>
-    <div class="row"><input id="add-remark" placeholder="节点备注，如 SJ-Reality-2"></div>
+    <h3><span data-i18n="builder_title">新建 / 自定义搭配节点</span><button class="btn" onclick="closeModal('modal-add')">✕</button></h3>
+    <div class="field-lbl">一键抗封场景模板（部署后自动联动 nftables 放行端口）</div>
+    <div class="presets">
+      <button type="button" class="preset sel" onclick="applyPreset('vless-xhttp-reality',this)"><b>VLESS + XHTTP + Reality</b><span>2026 抗封王牌 · Xray</span></button>
+      <button type="button" class="preset" onclick="applyPreset('vless-reality',this)"><b>VLESS + Vision + Reality</b><span>经典直连主力 · Xray</span></button>
+      <button type="button" class="preset" onclick="applyPreset('anytls',this)"><b>AnyTLS</b><span>抗 TLS-in-TLS · sing-box</span></button>
+      <button type="button" class="preset" onclick="applyPreset('hysteria2',this)"><b>Hysteria 2</b><span>QUIC + 端口跳跃 · sing-box</span></button>
+      <button type="button" class="preset" onclick="applyPreset('tuic',this)"><b>TUIC v5</b><span>轻量 0-RTT · sing-box</span></button>
+      <button type="button" class="preset" onclick="applyPreset('ss-2022',this)"><b>SS-2022</b><span>极速低延迟 · Xray</span></button>
+    </div>
+
+    <div class="field-lbl">自由自定义搭配（协议 × 传输 × 安全层）</div>
     <div class="row">
-      <select id="add-mode" onchange="onModeChange()">
-        <option value="reality">VLESS + Vision + Reality</option>
-        <option value="xhttp">VLESS + XHTTP（适合配合 CDN/Nginx）</option>
-        <option value="ws">VLESS + WebSocket（适合配合 CDN/Nginx）</option>
+      <input id="add-remark" placeholder="节点备注（留空自动命名）">
+    </div>
+    <div class="row">
+      <select id="add-proto" onchange="syncBuilder()">
+        <option value="vless">VLESS (Xray)</option>
+        <option value="anytls">AnyTLS (sing-box)</option>
+        <option value="hysteria2">Hysteria 2 (sing-box)</option>
+        <option value="tuic">TUIC v5 (sing-box)</option>
+        <option value="vmess">VMess (Xray)</option>
+        <option value="trojan">Trojan (Xray)</option>
+        <option value="shadowsocks">Shadowsocks (Xray)</option>
+      </select>
+      <select id="add-transport" onchange="syncBuilder()">
+        <option value="xhttp">XHTTP</option>
+        <option value="raw">RAW (TCP)</option>
+        <option value="ws">WebSocket (WS)</option>
+        <option value="grpc">gRPC</option>
+      </select>
+      <select id="add-security" onchange="syncBuilder()">
+        <option value="reality">Reality</option>
+        <option value="none">None（反代/无TLS）</option>
+        <option value="tls">TLS（证书）</option>
       </select>
     </div>
+
+    <div class="field-lbl">监听网卡与端口</div>
     <div class="row">
       <select id="add-listen">
         <option value="ipv6">仅 IPv6 监听（推荐防封）</option>
-        <option value="dual">IPv4 + IPv6 双栈（::）</option>
-        <option value="ipv4">仅 IPv4 监听（0.0.0.0）</option>
-        <option value="local">仅本机 127.0.0.1（前置 Nginx 反代）</option>
+        <option value="dual">IPv4 + IPv6 双栈 (::)</option>
+        <option value="ipv4">仅 IPv4 (0.0.0.0)</option>
+        <option value="local">仅本机 127.0.0.1（前置 Nginx）</option>
       </select>
-      <input id="add-port" type="number" value="8443" placeholder="端口">
+      <input id="add-port" type="number" value="8443" placeholder="端口" style="max-width:130px">
     </div>
-    <div class="row" id="row-sni"><input id="add-sni" value="www.berkeley.edu" placeholder="Reality 伪装域名 SNI"></div>
-    <div class="row" id="row-path" style="display:none"><input id="add-path" placeholder="路径，留空自动随机生成"></div>
-    <div class="btns" style="justify-content:flex-end;margin-top:16px">
+
+    <div id="sec-hop-box" style="display:none">
+      <div class="field-lbl">Hysteria 2 UDP 端口跳跃范围（可选，自动写入 nftables）</div>
+      <div class="row" style="margin-top:0"><input id="add-hop" placeholder="如 20000-30000（留空则单端口）"></div>
+    </div>
+
+    <div id="sec-sni-box">
+      <div class="field-lbl">伪装域名 SNI</div>
+      <div class="row" style="margin-top:0"><input id="add-sni" value="www.berkeley.edu" placeholder="如 www.berkeley.edu"></div>
+      <div class="chips">
+        <span class="chip" onclick="document.getElementById('add-sni').value='www.berkeley.edu'">www.berkeley.edu</span>
+        <span class="chip" onclick="document.getElementById('add-sni').value='www.cisco.com'">www.cisco.com</span>
+        <span class="chip" onclick="document.getElementById('add-sni').value='www.splunk.com'">www.splunk.com</span>
+      </div>
+    </div>
+
+    <div id="sec-path-box" style="display:none">
+      <div class="field-lbl" id="lbl-path">路径 Path / ServiceName</div>
+      <div class="row" style="margin-top:0"><input id="add-path" placeholder="留空自动生成随机路径"></div>
+    </div>
+
+    <div id="sec-ss-box" style="display:none">
+      <div class="field-lbl">Shadowsocks 加密方式</div>
+      <div class="row" style="margin-top:0">
+        <select id="add-ss-method">
+          <option value="2022-blake3-aes-128-gcm">2022-blake3-aes-128-gcm（推荐）</option>
+          <option value="2022-blake3-aes-256-gcm">2022-blake3-aes-256-gcm</option>
+          <option value="aes-256-gcm">aes-256-gcm</option>
+          <option value="chacha20-ietf-poly1305">chacha20-ietf-poly1305</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="btns" style="justify-content:flex-end;margin-top:18px">
       <button class="btn" onclick="closeModal('modal-add')">取消</button>
-      <button class="btn primary" onclick="submitAddNode()">创建并启用</button>
+      <button class="btn primary" onclick="submitAddNode()">一键部署并生效</button>
     </div>
   </div>
 </div>
 
 <!-- QR Modal -->
 <div class="modal-bg" id="modal-qr">
-  <div class="modal" style="text-align:center">
+  <div class="modal" style="text-align:center;max-width:400px">
     <h3><span id="qr-title">扫码导入</span><button class="btn" onclick="closeModal('modal-qr')">✕</button></h3>
     <div class="qr-box" id="qr-content">...</div>
-    <p class="sub">服务器本地 <code>qrencode</code> 离线生成 · 小火箭 / v2rayN 直接扫码</p>
+    <p class="sub">本地 <code>qrencode</code> 离线生成 · 支持小火箭 / v2rayN</p>
+  </div>
+</div>
+
+<!-- Self-Check Report Modal -->
+<div class="modal-bg" id="modal-check">
+  <div class="modal">
+    <h3><span id="chk-title">节点五维体检 &amp; GFW 阻断检测</span><button class="btn" onclick="closeDiagModal()">✕</button></h3>
+    <div id="chk-body" style="font-size:13px">检测中...</div>
+  </div>
+</div>
+
+<!-- Multi-Client Manager Modal (3x-ui style) -->
+<div class="modal-bg" id="modal-clients">
+  <div class="modal">
+    <h3><span id="cli-title">子用户管理</span><button class="btn" onclick="closeModal('modal-clients')">✕</button></h3>
+    <div class="row" style="margin-top:0;margin-bottom:12px">
+      <input id="cli-new-name" placeholder="输入设备或用户名，如 iPhone / MacBook">
+      <button class="btn primary" onclick="addClientNow()">+ 添加子用户</button>
+    </div>
+    <div id="cli-list"></div>
+  </div>
+</div>
+
+<!-- Subscription Export Modal -->
+<div class="modal-bg" id="modal-sub">
+  <div class="modal">
+    <h3><span>全节点聚合订阅导出</span><button class="btn" onclick="closeModal('modal-sub')">✕</button></h3>
+    <p class="sub" style="margin-top:0" id="sub-info">正在汇总所有运行中节点...</p>
+    <div class="field-lbl">Base64 通用订阅（v2rayN / 小火箭）</div>
+    <textarea id="sub-b64" readonly style="width:100%;height:74px;background:var(--inset);color:var(--blue);border:1px solid var(--border);border-radius:8px;padding:8px;font-family:var(--mono);font-size:11.5px;resize:none"></textarea>
+    <div class="btns" style="margin-top:6px"><button class="btn primary" onclick="copyText(document.getElementById('sub-b64').value)">复制 Base64 订阅</button><button class="btn" onclick="copyText(window._SUB_RAW||'')">复制明文链接列表</button></div>
+    <div class="field-lbl" style="margin-top:14px">Clash / Mihomo 完整代理组配置 (YAML)</div>
+    <textarea id="sub-clash" readonly style="width:100%;height:140px;background:var(--inset);color:var(--text2);border:1px solid var(--border);border-radius:8px;padding:8px;font-family:var(--mono);font-size:11.5px;resize:vertical"></textarea>
+    <div class="btns" style="margin-top:6px"><button class="btn info" onclick="copyText(document.getElementById('sub-clash').value)">复制 Clash YAML</button></div>
   </div>
 </div>
 
@@ -361,43 +724,52 @@
 <script>
 const I18N = {
   zh: {
-    nav_dash:'📊 仪表盘', nav_nodes:'🚀 节点管理', nav_routing:'🧭 路由与出站', nav_logs:'📜 系统日志', nav_settings:'⚙️ 设置与备份',
+    nav_dash:'概览仪表盘', nav_nodes:'节点与协议', nav_routing:'路由与家宽', nav_logs:'系统日志', nav_settings:'内核与设置',
     fw:'防火墙', uptime:'在线', logout:'退出',
     kpi_today:'今日流量 / 本月累计', kpi_rate:'实时下载速率', kpi_mem:'内存 / CPU 负载', kpi_sec:'SSH 防爆破 / 磁盘',
-    chart_live:'实时速率趋势（5秒）', chart_daily:'近 14 天持久化流量（SQLite）', quick_ops:'快捷运维',
-    btn_add_node:'➕ 新增节点', btn_check:'🩺 主节点一键自检', btn_restart:'♻️ 重启 Xray', btn_backup:'💾 一键下载配置备份',
-    nodes_title:'入站节点列表', nodes_sub:'支持 VLESS + Vision + Reality、VLESS + XHTTP、VLESS + WS；点击任意参数即可复制',
-    routing_title:'路由规则与出站策略', r_cn:'拦截中国大陆网站与 IP（防回国绕路特征）', r_cn_sub:'geosite:cn / geoip:cn → block（强烈建议开启）',
-    r_bt:'屏蔽 BitTorrent / P2P 下载', r_bt_sub:'防止 BT 流量引发机房投诉或封机',
-    r_priv:'屏蔽私有 / 局域网 IP 访问', r_priv_sub:'geoip:private → block，防止内网探测',
-    r_out:'出站 IP 优先级策略', r_out_sub:'推荐仅 IPv4（UseIPv4），避免 IPv6 触发 Google 验证码',
-    btn_save_routing:'保存并生效', btn_refresh:'刷新', set_pw:'修改面板登录密码', btn_save_pw:'保存新密码', set_backup:'备份与项目信息',
-    xray_mgr:'🔧 Xray 内核版本管理', xray_mgr_sub:'支持升级到最新版本或随时降级回退到任意历史版本；切换前自动备份旧内核，若新版本与当前配置不兼容将自动回滚，防止断联。',
-    btn_refresh_ver:'刷新版本列表', btn_switch_xray:'⬆️ 切换 / 升级所选版本', btn_geodata:'🌍 更新 GeoIP / GeoSite',
-    confirm_restart:'确认重启 Xray 服务吗？', copied:'已复制到剪贴板'
+    chart_live:'实时速率趋势（5s）', chart_daily:'近 14 天持久化流量', quick_ops:'快捷操作',
+    btn_add_node:'+ 新建 / 搭配节点', btn_check:'节点五维体检 & GFW 检测', btn_restart:'重启 Xray', btn_backup:'下载配置备份 (.tar.gz)',
+    nodes_title:'入站节点管理', nodes_sub:'支持 VLESS / VMess / Trojan / Shadowsocks-2022 自由组合（Reality / WS / XHTTP / gRPC），点击参数即可复制',
+    routing_title:'基础路由规则与出站策略', r_cn:'拦截中国大陆网站与 IP', r_cn_sub:'geosite:cn / geoip:cn → block（强烈建议开启，防止回国绕路特征）',
+    r_bt:'屏蔽 BitTorrent / P2P', r_bt_sub:'防止 BT 流量引发机房投诉',
+    r_priv:'屏蔽私有 / 局域网 IP', r_priv_sub:'geoip:private → block',
+    r_out:'出站 IP 优先级策略', r_out_sub:'推荐 UseIPv4，避免 VPS IPv6 触发验证码',
+    btn_save_routing:'保存并生效', btn_refresh:'刷新', set_pw:'修改面板密码', btn_save_pw:'保存新密码', set_backup:'备份与项目信息',
+    xray_mgr:'Xray 内核版本管理', xray_mgr_sub:'支持升级至最新版或降级回退到任意历史版本；切换前自动备份旧二进制，若配置校验失败自动回滚。',
+    btn_refresh_ver:'刷新版本列表', btn_switch_xray:'切换 / 升级所选版本', btn_geodata:'更新 GeoIP / GeoSite',
+    s5_title:'家宽 SOCKS5 出口路由（链式落地 IP）', s5_sub:'输入代理商提供的住宅 / 家宽 SOCKS5 账号密码，将出口路由至纯净家宽 IP（解锁 ChatGPT / Claude / TikTok / Netflix）。',
+    s5_enable:'启用 SOCKS5 家宽出口', s5_enable_sub:'关闭后立即恢复 VPS 原生直出', btn_s5_test:'测试连通性与落地 IP', btn_s5_save:'保存并应用家宽路由',
+    builder_title:'新建 / 自定义搭配节点', confirm_restart:'确认重启 Xray 服务吗？', copied:'已复制到剪贴板'
   },
   en: {
-    nav_dash:'📊 Dashboard', nav_nodes:'🚀 Nodes', nav_routing:'🧭 Routing', nav_logs:'📜 Logs', nav_settings:'⚙️ Settings',
+    nav_dash:'Overview', nav_nodes:'Nodes & Protocols', nav_routing:'Routing & SOCKS5', nav_logs:'System Logs', nav_settings:'Core & Settings',
     fw:'Firewall', uptime:'Up', logout:'Logout',
     kpi_today:'Today / Monthly Traffic', kpi_rate:'Live Download Rate', kpi_mem:'Memory / CPU Load', kpi_sec:'Fail2ban SSH / Disk',
-    chart_live:'Live Speed (5s)', chart_daily:'14-Day Persisted Traffic (SQLite)', quick_ops:'Quick Actions',
-    btn_add_node:'➕ Add Node', btn_check:'🩺 Self-Check Node', btn_restart:'♻️ Restart Xray', btn_backup:'💾 Download Backup',
-    nodes_title:'Inbound Nodes', nodes_sub:'Supports VLESS+Reality, XHTTP, and WS. Click any field to copy.',
+    chart_live:'Live Speed (5s)', chart_daily:'14-Day Traffic (SQLite)', quick_ops:'Quick Actions',
+    btn_add_node:'+ Deploy Node', btn_check:'5D Health & GFW Check', btn_restart:'Restart Xray', btn_backup:'Download Backup (.tar.gz)',
+    nodes_title:'Inbound Nodes', nodes_sub:'Mix VLESS / VMess / Trojan / SS-2022 with Reality / WS / XHTTP / gRPC. Click any field to copy.',
     routing_title:'Routing & Outbound Policy', r_cn:'Block Mainland China (CN) Traffic', r_cn_sub:'geosite:cn / geoip:cn → block (recommended)',
     r_bt:'Block BitTorrent / P2P', r_bt_sub:'Avoid abuse complaints on VPS',
     r_priv:'Block Private / LAN IPs', r_priv_sub:'geoip:private → block',
     r_out:'Outbound IP Strategy', r_out_sub:'UseIPv4 avoids CAPTCHA on Google/AI services',
     btn_save_routing:'Save & Apply', btn_refresh:'Refresh', set_pw:'Change Panel Password', btn_save_pw:'Save Password', set_backup:'Backup & About',
-    xray_mgr:'🔧 Xray Core Version Manager', xray_mgr_sub:'Upgrade to latest or rollback to any historical release. Automatically backs up the current binary and rolls back if config validation fails.',
-    btn_refresh_ver:'Refresh Releases', btn_switch_xray:'⬆️ Switch / Upgrade Core', btn_geodata:'🌍 Update GeoIP / GeoSite',
-    confirm_restart:'Restart Xray service?', copied:'Copied to clipboard'
+    xray_mgr:'Xray Core Version Manager', xray_mgr_sub:'Upgrade to latest or rollback to any historical release with automatic backup & recovery.',
+    btn_refresh_ver:'Refresh Releases', btn_switch_xray:'Switch / Upgrade Core', btn_geodata:'Update GeoIP / GeoSite',
+    s5_title:'Residential SOCKS5 Outbound Routing', s5_sub:'Route outbound traffic through a residential SOCKS5 proxy for AI & streaming unlock.',
+    s5_enable:'Enable SOCKS5 Outbound', s5_enable_sub:'Disable to restore direct VPS outbound immediately', btn_s5_test:'Test SOCKS5 & Exit IP', btn_s5_save:'Save & Apply SOCKS5',
+    builder_title:'Deploy / Custom Node Builder', confirm_restart:'Restart Xray service?', copied:'Copied to clipboard'
   }
 };
 let LANG = localStorage.getItem('quackui_lang') || 'zh';
+let ACTIVE_TAB = 'dash';
 function T(k){ return (I18N[LANG] && I18N[LANG][k]) || I18N.zh[k] || k; }
 function applyLang(){
   document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = T(el.getAttribute('data-i18n')); });
   document.getElementById('lang-btn').textContent = LANG==='zh'?'EN':'中';
+  const curTheme = document.documentElement.getAttribute('data-theme');
+  document.getElementById('theme-btn').textContent = curTheme==='light'?(LANG==='en'?'Dark':'深色'):(LANG==='en'?'Light':'浅色');
+  const map = {dash:'nav_dash',nodes:'nav_nodes',routing:'nav_routing',logs:'nav_logs',settings:'nav_settings'};
+  document.getElementById('page-title').textContent = T(map[ACTIVE_TAB]||'nav_dash');
 }
 function toggleLang(){
   LANG = LANG==='zh'?'en':'zh';
@@ -407,10 +779,18 @@ function toggleLang(){
 
 const HIST = { down:[], up:[], max:40 };
 let DAILY = [];
-let LOG_CACHE = { xray:'', fail2ban:'', firewall:'' };
+let LOG_CACHE = { xray:'', singbox:'', fail2ban:'', firewall:'' };
 let CUR_LOG = 'xray';
 let ROUTING_LOADED = false;
+let XRAY_RELEASES_LOADED = false;
+let LAST_NODES_SIG = '';
+let LAST_NODES_DATA = [];
+let CUR_CLI_TAG = '';
+let CUR_RAW_ENG = 'xray';
 
+function escHtml(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 function fmtBytes(b){
   b = Number(b)||0;
   if(b<1024) return b.toFixed(0)+' B';
@@ -420,39 +800,40 @@ function fmtBytes(b){
 }
 function fmtUptime(s){
   const d=Math.floor(s/86400), h=Math.floor((s%86400)/3600), m=Math.floor((s%3600)/60);
-  return LANG==='en' ? `${d}d ${h}h ${m}m` : (d?d+'天 ':'')+(h?h+'时 ':'')+m+'分';
+  return LANG==='en' ? `${d}d ${h}h ${m}m` : (d?d+'d ':'')+(h?h+'h ':'')+m+'m';
 }
 function toast(msg){
   const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block';
   clearTimeout(window._tt); window._tt=setTimeout(()=>t.style.display='none',3200);
 }
 function switchTab(id,btn){
+  ACTIVE_TAB = id;
   document.querySelectorAll('.tab-pane').forEach(p=>p.classList.remove('active'));
   document.getElementById('tab-'+id).classList.add('active');
   document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));
   if(btn) btn.classList.add('active');
+  applyLang();
   if(id==='logs') loadLogs();
-  if(id==='settings') loadXrayReleases(false);
+  if(id==='settings'){ loadXrayReleases(false); loadRawCfg(CUR_RAW_ENG); }
   if(id==='dash'){ drawLiveChart(); drawDailyChart(); }
 }
 function toggleTheme(){
   const cur = document.documentElement.getAttribute('data-theme')==='light'?'dark':'light';
   document.documentElement.setAttribute('data-theme', cur);
   localStorage.setItem('quackui_theme', cur);
-  document.getElementById('theme-btn').textContent = cur==='light'?'🌙 深色':'☀️ 浅色';
+  applyLang();
   drawLiveChart(); drawDailyChart();
 }
 (function(){
   const saved = localStorage.getItem('quackui_theme') || 'dark';
   document.documentElement.setAttribute('data-theme', saved);
-  document.getElementById('theme-btn').textContent = saved==='light'?'🌙 深色':'☀️ 浅色';
   applyLang();
 })();
 
 function setSvc(dotId, stId, st){
   const ok = st==='active';
   document.getElementById(dotId).className = 'dot'+(ok?'':' bad');
-  document.getElementById(stId).textContent = ok?(LANG==='en'?'OK':'正常'):st;
+  document.getElementById(stId).textContent = ok?'OK':st;
 }
 
 function drawLiveChart(){
@@ -462,12 +843,12 @@ function drawLiveChart(){
   cv.width = w*dpr; cv.height = h*dpr;
   const ctx = cv.getContext('2d'); ctx.scale(dpr,dpr); ctx.clearRect(0,0,w,h);
   const maxV = Math.max(1024, ...HIST.down, ...HIST.up) * 1.15;
-  const pad = { l:56, r:12, t:12, b:20 }, cw = w-pad.l-pad.r, ch = h-pad.t-pad.b;
-  ctx.strokeStyle = 'rgba(148,163,184,.14)'; ctx.fillStyle = '#94a3b8'; ctx.font = '11px ui-monospace,Consolas,monospace';
+  const pad = { l:58, r:10, t:12, b:20 }, cw = w-pad.l-pad.r, ch = h-pad.t-pad.b;
+  ctx.strokeStyle = 'rgba(148,163,184,.12)'; ctx.fillStyle = '#7c8ba1'; ctx.font = '10.5px ui-monospace,Consolas,monospace';
   for(let i=0;i<=3;i++){
     const y = pad.t + ch*(i/3);
     ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
-    ctx.fillText(fmtBytes(maxV*(1-i/3))+'/s', 4, y+4);
+    ctx.fillText(fmtBytes(maxV*(1-i/3))+'/s', 4, y+3);
   }
   function plot(arr, color, fill){
     if(arr.length<2) return;
@@ -477,12 +858,12 @@ function drawLiveChart(){
       const y = pad.t + ch*(1-Math.min(v,maxV)/maxV);
       idx===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
     });
-    ctx.strokeStyle=color; ctx.lineWidth=2; ctx.stroke();
+    ctx.strokeStyle=color; ctx.lineWidth=1.8; ctx.stroke();
     ctx.lineTo(pad.l+cw*((arr.length-1)/(HIST.max-1)), pad.t+ch);
     ctx.lineTo(pad.l, pad.t+ch); ctx.closePath(); ctx.fillStyle=fill; ctx.fill();
   }
-  plot(HIST.down, '#38bdf8', 'rgba(56,189,248,.12)');
-  plot(HIST.up, '#f59e0b', 'rgba(245,158,11,.10)');
+  plot(HIST.down, '#38bdf8', 'rgba(56,189,248,.10)');
+  plot(HIST.up, '#f59e0b', 'rgba(245,158,11,.08)');
 }
 
 function drawDailyChart(){
@@ -493,15 +874,15 @@ function drawDailyChart(){
   const ctx = cv.getContext('2d'); ctx.scale(dpr,dpr); ctx.clearRect(0,0,w,h);
   const totals = DAILY.map(x=>x.up+x.down);
   const maxV = Math.max(1024*1024, ...totals) * 1.15;
-  const pad = { l:52, r:10, t:12, b:24 }, cw = w-pad.l-pad.r, ch = h-pad.t-pad.b;
-  ctx.strokeStyle = 'rgba(148,163,184,.14)'; ctx.fillStyle = '#94a3b8'; ctx.font = '10.5px ui-monospace,Consolas,monospace';
+  const pad = { l:52, r:10, t:12, b:22 }, cw = w-pad.l-pad.r, ch = h-pad.t-pad.b;
+  ctx.strokeStyle = 'rgba(148,163,184,.12)'; ctx.fillStyle = '#7c8ba1'; ctx.font = '10.5px ui-monospace,Consolas,monospace';
   for(let i=0;i<=3;i++){
     const y = pad.t + ch*(i/3);
     ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
-    ctx.fillText(fmtBytes(maxV*(1-i/3)), 4, y+4);
+    ctx.fillText(fmtBytes(maxV*(1-i/3)), 4, y+3);
   }
   const step = cw / DAILY.length;
-  const bw = Math.max(8, step * 0.56);
+  const bw = Math.max(8, step * 0.52);
   DAILY.forEach((d, i)=>{
     const x = pad.l + i*step + (step-bw)/2;
     const tot = d.up + d.down;
@@ -511,54 +892,70 @@ function drawDailyChart(){
     ctx.fillStyle = grad;
     ctx.fillRect(x, pad.t+ch-bh, bw, bh);
     if(i%2===0 || i===DAILY.length-1){
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillText(d.date, x-4, h-6);
+      ctx.fillStyle = '#7c8ba1';
+      ctx.fillText(d.date, x-4, h-5);
     }
   });
 }
 
 function renderNodes(nodes){
+  LAST_NODES_DATA = nodes;
+  const sig = JSON.stringify(nodes);
+  if(sig === LAST_NODES_SIG) return;
+  LAST_NODES_SIG = sig;
   const box = document.getElementById('nodes-list');
-  if(!nodes.length){ box.innerHTML = '<div class="card sub">暂无节点</div>'; return; }
+  if(!nodes.length){ box.innerHTML = '<div class="card sub">暂无节点，点击右上角新建</div>'; return; }
   box.innerHTML = nodes.map(n=>{
-    const tr = fmtBytes((n.traffic.up||0)+(n.traffic.down||0));
+    const totBytes = (n.traffic.up||0)+(n.traffic.down||0);
+    const tr = fmtBytes(totBytes);
+    const qBytes = (n.quota_gb||0) * 1024 * 1024 * 1024;
+    const qPct = qBytes > 0 ? Math.min(100, Math.round(totBytes*100/qBytes)) : 0;
     const isReality = n.security==='reality';
+    const isSS = n.protocol==='shadowsocks';
     const safeUri = encodeURIComponent(n.uri||'');
     const safeClash = encodeURIComponent(n.clash_yaml||'');
-    return `<div class="node-card ${n.enabled?'':'off'}">
+    const safeRemark = encodeURIComponent(n.remark||'');
+    const safeTag = escHtml(n.tag);
+    const dispRemark = escHtml(n.remark);
+    const secLabel = n.security==='none' ? n.network.toUpperCase() : `${n.network.toUpperCase()} + ${n.security.toUpperCase()}`;
+    const cliCnt = (n.clients||[]).length;
+    return `<div class="node-card proto-${escHtml(n.protocol)} ${n.enabled?'':'off'}">
       <div class="node-head">
         <div>
-          <b>${n.remark}</b>
-          <div class="node-tags" style="margin-top:6px">
-            <span class="tag ${n.enabled?'ok':''}">${n.enabled?'运行中':'已停用'}</span>
-            <span class="tag accent">${n.protocol.toUpperCase()} · ${isReality?'Reality':n.network.toUpperCase()}</span>
-            <span class="tag">${n.listen}:${n.port}</span>
-            <span class="tag">累计 ${tr}</span>
+          <div class="node-name">${dispRemark} <button class="rename-btn" title="重命名" onclick="promptRename('${safeTag}', decodeURIComponent('${safeRemark}'))">✎</button> <span class="tag ${n.enabled?'ok':''}">${n.enabled?'ACTIVE':'STOPPED'}</span> <span class="tag">${escHtml((n.engine||'xray').toUpperCase())}</span></div>
+          <div class="node-tags">
+            <span class="tag accent">${escHtml(n.protocol.toUpperCase())} · ${escHtml(isSS ? n.ss_method : secLabel)}</span>
+            <span class="tag">${escHtml(n.listen)}:${n.port}${n.hop_range?(' (hop '+escHtml(n.hop_range)+')'):''}</span>
+            <span class="tag">Traffic ${tr}${n.quota_gb>0?(' / '+n.quota_gb+' GB ('+qPct+'%)'):''}</span>
+            ${n.expire_date?`<span class="tag">Exp ${escHtml(n.expire_date)}</span>`:''}
           </div>
+          ${qBytes>0?`<div class="bar" style="max-width:340px;margin-top:8px"><i style="width:${qPct}%"></i></div>`:''}
         </div>
         <div class="btns" style="margin-top:0">
-          <button class="btn primary" onclick="copyText(decodeURIComponent('${safeUri}'))">📋 复制链接</button>
-          <button class="btn info" onclick="copyText(decodeURIComponent('${safeClash}'))">⚡ Clash YAML</button>
-          <button class="btn" onclick="openQr('${n.remark}', decodeURIComponent('${safeUri}'))">📱 二维码</button>
-          <button class="btn" onclick="doPost('/api/nodes/toggle',{tag:'${n.tag}'})">${n.enabled?'⏸ 停用':'▶ 启用'}</button>
-          <button class="btn danger" onclick="doPost('/api/nodes/delete',{tag:'${n.tag}'},'确认删除节点 ${n.remark} 吗？')">🗑 删除</button>
+          <button class="btn primary" onclick="copyText(decodeURIComponent('${safeUri}'))">复制链接</button>
+          <button class="btn info" onclick="copyText(decodeURIComponent('${safeClash}'))">Clash YAML</button>
+          <button class="btn" onclick="openQr(decodeURIComponent('${safeRemark}'), decodeURIComponent('${safeUri}'))">二维码</button>
+          ${!isSS?`<button class="btn" onclick="openClientsModal('${safeTag}')">子用户 (${cliCnt})</button>`:''}
+          <button class="btn" onclick="doPost('/api/nodes/toggle',{tag:'${safeTag}'})">${n.enabled?'停用':'启用'}</button>
+          <button class="btn danger" onclick="doPost('/api/nodes/delete',{tag:'${safeTag}'},'确认删除节点 '+decodeURIComponent('${safeRemark}')+' 吗？')">删除</button>
         </div>
       </div>
       <div class="kv">
-        <div class="lbl">UUID</div><div class="mono" onclick="copyText(this.textContent)">${n.uuid}</div>
+        <div class="lbl">${isSS?'Password':(n.protocol==='trojan'?'Password':'UUID')}</div>
+        <div class="mono" onclick="copyText(this.textContent)">${escHtml(n.uuid)}</div>
         ${isReality ? `
-          <div class="lbl">伪装 SNI</div><div class="mono" onclick="copyText(this.textContent)">${n.sni}</div>
-          <div class="lbl">PublicKey</div><div class="mono" onclick="copyText(this.textContent)">${n.pub}</div>
-          <div class="lbl">ShortId</div><div class="mono" onclick="copyText(this.textContent)">${n.sid}</div>
-        ` : `
-          <div class="lbl">Path</div><div class="mono" onclick="copyText(this.textContent)">${n.path}</div>
-        `}
+          <div class="lbl">SNI</div><div class="mono" onclick="copyText(this.textContent)">${escHtml(n.sni)}</div>
+          <div class="lbl">PublicKey</div><div class="mono" onclick="copyText(this.textContent)">${escHtml(n.pub)}</div>
+          <div class="lbl">ShortId</div><div class="mono" onclick="copyText(this.textContent)">${escHtml(n.sid)}</div>
+        ` : (n.path ? `<div class="lbl">Path / Svc</div><div class="mono" onclick="copyText(this.textContent)">${escHtml(n.path)}</div>` : '')}
       </div>
       ${n.enabled ? `<div class="btns">
-        ${n.is_v6 ? `<button class="btn warn" onclick="doPost('/api/rotate-v6',{tag:'${n.tag}'},'确认从 /64 网段更换一个新的 IPv6 地址吗？')">🔄 一键换 IPv6</button>` : ''}
-        ${isReality ? `<button class="btn info" onclick="promptSni('${n.tag}','${n.sni}')">🌐 修改 SNI</button>` : ''}
-        <button class="btn" onclick="doPost('/api/rotate-cred',{tag:'${n.tag}'},'确认重置该节点的 UUID / ShortId 吗？')">🔑 重置密钥</button>
-        ${isReality ? `<button class="btn" onclick="selfCheck('${n.tag}')">🩺 自检</button>` : ''}
+        ${n.is_v6 ? `<button class="btn warn" onclick="doPost('/api/rotate-v6',{tag:'${safeTag}'},'确认从 /64 网段更换一个新的 IPv6 地址吗？')">一键换 IPv6</button>` : ''}
+        ${isReality ? `<button class="btn info" onclick="promptSni('${safeTag}','${escHtml(n.sni)}')">修改 SNI</button>` : ''}
+        <button class="btn" onclick="promptLimits('${safeTag}',${n.quota_gb||0},'${escHtml(n.expire_date||'')}')">限额 / 到期</button>
+        <button class="btn" onclick="doPost('/api/nodes/reset-traffic',{tag:'${safeTag}'},'确认清零该节点的累计流量统计吗？')">清零流量</button>
+        <button class="btn" onclick="doPost('/api/rotate-cred',{tag:'${safeTag}'},'确认重置该节点的密钥吗？')">重置密钥</button>
+        ${isReality ? `<button class="btn" onclick="selfCheck('${safeTag}')">五维体检</button>` : ''}
       </div>` : ''}
     </div>`;
   }).join('');
@@ -573,6 +970,15 @@ async function refresh(){
     document.getElementById('about-ver').textContent = d.sys.version;
     document.getElementById('xray-ver').textContent = d.sys.xray_version;
     document.getElementById('xray-cur-ver').textContent = d.sys.xray_version;
+    document.getElementById('sb-ver').textContent = d.sys.singbox_version || '-';
+    document.getElementById('sb-cur-ver').textContent = d.sys.singbox_version || '未安装';
+    document.getElementById('sys-os').textContent = d.sys.os || '-';
+    document.getElementById('sys-kern').textContent = (d.sys.kernel||'').split('-')[0] || '-';
+    document.getElementById('sys-bbr').textContent = (d.sys.tcp_cc||'-').toUpperCase();
+    document.getElementById('sys-v4').textContent = d.sys.ipv4 || '-';
+    document.getElementById('sys-v6').textContent = d.sys.ipv6 || '-';
+    const sbDot = document.getElementById('dot-sb-side');
+    if(sbDot) sbDot.className = 'dot' + (d.sys.singbox_version && d.sys.singbox_version!=='-' ? '' : ' bad');
     setSvc('dot-xray','st-xray',d.sys.services.xray);
     setSvc('dot-nft','st-nft',d.sys.services.nftables);
     setSvc('dot-f2b','st-f2b',d.sys.services.fail2ban);
@@ -582,20 +988,29 @@ async function refresh(){
     const tm = d.traffic.month.up + d.traffic.month.down;
     const ta = d.traffic.total.up + d.traffic.total.down;
     document.getElementById('tr-today').textContent = fmtBytes(td);
-    document.getElementById('tr-month').textContent = `本月 ${fmtBytes(tm)} · ↑${fmtBytes(d.traffic.today.up)} ↓${fmtBytes(d.traffic.today.down)}`;
-    document.getElementById('tr-total').textContent = `历史总计 ${fmtBytes(ta)}`;
+    document.getElementById('tr-month').textContent = `Month ${fmtBytes(tm)} · ↑${fmtBytes(d.traffic.today.up)} ↓${fmtBytes(d.traffic.today.down)}`;
+    document.getElementById('tr-total').textContent = `Total ${fmtBytes(ta)}`;
     document.getElementById('tr-rate').textContent = fmtBytes(d.traffic.down_rate)+'/s';
-    document.getElementById('active-conns').textContent = `↑ ${fmtBytes(d.traffic.up_rate)}/s · 活跃连接 ${d.sys.active_conns}`;
+    document.getElementById('active-conns').textContent = `↑ ${fmtBytes(d.traffic.up_rate)}/s · Conns ${d.sys.active_conns}`;
 
     const mp = Math.round(d.sys.mem_used*100/d.sys.mem_total);
     document.getElementById('mem-val').textContent = `${fmtBytes(d.sys.mem_used)} / ${fmtBytes(d.sys.mem_total)}`;
     document.getElementById('mem-bar').style.width = mp+'%';
-    document.getElementById('cpu-load').textContent = `CPU (${d.sys.cpus}核) 负载: ${d.sys.load.join(' / ')}`;
-    document.getElementById('f2b-tot').textContent = `${d.sys.fail2ban.total} 次`;
-    document.getElementById('disk-val').textContent = `封禁中 ${d.sys.fail2ban.current} · 磁盘 ${fmtBytes(d.sys.disk_used)}/${fmtBytes(d.sys.disk_total)}`;
+    document.getElementById('cpu-load').textContent = `CPU (${d.sys.cpus}c) Load: ${d.sys.load.join(' / ')}`;
+    document.getElementById('f2b-tot').textContent = `${d.sys.fail2ban.total}`;
+    document.getElementById('disk-val').textContent = `Banned ${d.sys.fail2ban.current} · Disk ${fmtBytes(d.sys.disk_used)}/${fmtBytes(d.sys.disk_total)}`;
 
     const enabledCnt = d.nodes.filter(x=>x.enabled).length;
-    document.getElementById('dash-summary').textContent = `共 ${d.nodes.length} 个节点（${enabledCnt} 个运行中）· 出站 ${d.routing.outbound_strategy}`;
+    const badgeEl = document.getElementById('nav-node-cnt');
+    if(badgeEl) badgeEl.textContent = String(enabledCnt);
+    const s5Txt = (d.socks5 && d.socks5.enabled) ? ` · SOCKS5 (${d.socks5.mode})` : '';
+    document.getElementById('dash-summary').textContent = `${enabledCnt}/${d.nodes.length} Active · Outbound ${d.routing.outbound_strategy}${s5Txt}`;
+
+    const s5b = document.getElementById('s5-badge');
+    if(s5b && d.socks5){
+      s5b.textContent = d.socks5.enabled ? `ACTIVE · ${d.socks5.host}:${d.socks5.port}` : 'DISABLED';
+      s5b.className = 'tag' + (d.socks5.enabled ? ' ok' : '');
+    }
 
     HIST.down.push(d.traffic.down_rate); HIST.up.push(d.traffic.up_rate);
     if(HIST.down.length>HIST.max){ HIST.down.shift(); HIST.up.shift(); }
@@ -608,9 +1023,81 @@ async function refresh(){
       document.getElementById('sw-bt').checked = d.routing.block_bt;
       document.getElementById('sw-priv').checked = d.routing.block_private;
       document.getElementById('sel-strategy').value = d.routing.outbound_strategy;
+      if(d.socks5){
+        document.getElementById('s5-enabled').checked = !!d.socks5.enabled;
+        document.getElementById('s5-host').value = d.socks5.host || '';
+        document.getElementById('s5-port').value = d.socks5.port || 1080;
+        document.getElementById('s5-user').value = d.socks5.username || '';
+        document.getElementById('s5-pass').value = d.socks5.password || '';
+        document.getElementById('s5-mode').value = d.socks5.mode || 'all';
+        document.getElementById('s5-domains').value = d.socks5.custom_domains || '';
+        onS5ModeChange();
+      }
       ROUTING_LOADED = true;
     }
   }catch(e){}
+}
+
+/* Node Builder Logic */
+function openAddModal(){
+  document.getElementById('modal-add').classList.add('open');
+  syncBuilder();
+}
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+function applyPreset(name, el){
+  document.querySelectorAll('.preset').forEach(x=>x.classList.remove('sel'));
+  if(el) el.classList.add('sel');
+  const p = document.getElementById('add-proto');
+  const t = document.getElementById('add-transport');
+  const s = document.getElementById('add-security');
+  const l = document.getElementById('add-listen');
+  const port = document.getElementById('add-port');
+  const hop = document.getElementById('add-hop');
+  hop.value = '';
+  if(name==='vless-xhttp-reality'){ p.value='vless'; t.value='xhttp'; s.value='reality'; l.value='ipv6'; port.value=8443; }
+  else if(name==='vless-reality'){ p.value='vless'; t.value='raw'; s.value='reality'; l.value='ipv6'; port.value=8444; }
+  else if(name==='anytls'){ p.value='anytls'; t.value='raw'; s.value='tls'; l.value='ipv6'; port.value=8445; }
+  else if(name==='hysteria2'){ p.value='hysteria2'; t.value='raw'; s.value='tls'; l.value='ipv6'; port.value=8446; hop.value='20000-30000'; }
+  else if(name==='tuic'){ p.value='tuic'; t.value='raw'; s.value='tls'; l.value='ipv6'; port.value=8447; }
+  else if(name==='ss-2022'){ p.value='shadowsocks'; t.value='raw'; s.value='none'; l.value='ipv6'; port.value=8388; }
+  syncBuilder();
+}
+function syncBuilder(){
+  const proto = document.getElementById('add-proto').value;
+  const tr = document.getElementById('add-transport');
+  const sec = document.getElementById('add-security');
+  const isSS = proto==='shadowsocks';
+  const isSB = (proto==='anytls' || proto==='hysteria2' || proto==='tuic');
+  tr.disabled = isSS || isSB;
+  sec.disabled = isSS || isSB;
+  if(isSS){ tr.value='raw'; sec.value='none'; }
+  if(isSB){ tr.value='raw'; sec.value='tls'; }
+  if(proto==='vmess' && sec.value==='reality'){ sec.value='none'; }
+  document.getElementById('sec-ss-box').style.display = isSS ? 'block' : 'none';
+  document.getElementById('sec-hop-box').style.display = (proto==='hysteria2') ? 'block' : 'none';
+  document.getElementById('sec-sni-box').style.display = (!isSS && (sec.value==='reality' || sec.value==='tls' || isSB)) ? 'block' : 'none';
+  const needPath = !isSS && !isSB && (tr.value==='ws' || tr.value==='xhttp' || tr.value==='grpc');
+  document.getElementById('sec-path-box').style.display = needPath ? 'block' : 'none';
+  document.getElementById('lbl-path').textContent = tr.value==='grpc' ? 'gRPC ServiceName' : '传输路径 Path';
+}
+async function submitAddNode(){
+  const payload = {
+    remark: document.getElementById('add-remark').value,
+    protocol: document.getElementById('add-proto').value,
+    transport: document.getElementById('add-transport').value,
+    security: document.getElementById('add-security').value,
+    listen_type: document.getElementById('add-listen').value,
+    port: Number(document.getElementById('add-port').value),
+    sni: document.getElementById('add-sni').value,
+    path: document.getElementById('add-path').value,
+    ss_method: document.getElementById('add-ss-method').value,
+    hop_range: document.getElementById('add-hop').value.trim(),
+  };
+  toast('正在部署节点并自动同步防火墙...');
+  const r = await fetch('/api/nodes/add', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const d = await r.json();
+  toast(d.ok ? d.msg : ('失败: '+d.err));
+  if(d.ok){ closeModal('modal-add'); refresh(); }
 }
 
 async function doPost(url, payload, confirmMsg){
@@ -625,27 +1112,80 @@ function promptSni(tag, cur){
   const ns = prompt('输入新的伪装域名（需支持 TLS 1.3 + HTTP/2）：', cur);
   if(ns && ns.trim() && ns.trim()!==cur) doPost('/api/set-sni', {tag, sni:ns.trim()});
 }
-function openAddModal(){ document.getElementById('modal-add').classList.add('open'); }
-function closeModal(id){ document.getElementById(id).classList.remove('open'); }
-function onModeChange(){
-  const m = document.getElementById('add-mode').value;
-  document.getElementById('row-sni').style.display = m==='reality'?'flex':'none';
-  document.getElementById('row-path').style.display = m!=='reality'?'flex':'none';
+function promptRename(tag, cur){
+  const nr = prompt('输入新的节点备注名称：', cur);
+  if(nr && nr.trim() && nr.trim()!==cur) doPost('/api/nodes/rename', {tag, remark:nr.trim()});
 }
-async function submitAddNode(){
-  const payload = {
-    remark: document.getElementById('add-remark').value,
-    mode: document.getElementById('add-mode').value,
-    listen_type: document.getElementById('add-listen').value,
-    port: Number(document.getElementById('add-port').value),
-    sni: document.getElementById('add-sni').value,
-    path: document.getElementById('add-path').value,
-  };
-  toast('正在创建节点...');
-  const r = await fetch('/api/nodes/add', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+function promptLimits(tag, curQ, curExp){
+  const q = prompt('设置月流量限额（GB，填 0 表示不限制）：', String(curQ||0));
+  if(q === null) return;
+  const exp = prompt('设置到期日期（YYYY-MM-DD，留空表示永不过期）：', curExp||'');
+  if(exp === null) return;
+  doPost('/api/nodes/limits', {tag, quota_gb: Number(q)||0, expire_date: exp.trim()});
+}
+function openClientsModal(tag){
+  CUR_CLI_TAG = tag;
+  renderClientsModal();
+  document.getElementById('modal-clients').classList.add('open');
+}
+function renderClientsModal(){
+  const n = LAST_NODES_DATA.find(x=>x.tag===CUR_CLI_TAG);
+  if(!n) return;
+  document.getElementById('cli-title').textContent = `子用户管理 · ${n.remark}`;
+  const list = n.clients || [];
+  document.getElementById('cli-list').innerHTML = list.map((c, idx)=>`
+    <div class="diag-item" style="flex-wrap:wrap">
+      <div>
+        <b>${escHtml(c.name)}</b>
+        <div class="sub" style="font-family:var(--mono);font-size:11px;margin-top:2px">${escHtml((c.id||'').slice(0,32))}...</div>
+      </div>
+      <div class="btns" style="margin-top:0">
+        <button class="btn primary" onclick="copyText(decodeURIComponent('${encodeURIComponent(c.uri||'')}'))">链接</button>
+        <button class="btn" onclick="openQr(decodeURIComponent('${encodeURIComponent(n.remark+'-'+c.name)}'), decodeURIComponent('${encodeURIComponent(c.uri||'')}'))">二维码</button>
+        ${list.length>1?`<button class="btn danger" onclick="delClientNow(${idx})">删除</button>`:''}
+      </div>
+    </div>`).join('');
+}
+async function addClientNow(){
+  const name = document.getElementById('cli-new-name').value.trim();
+  const r = await fetch('/api/nodes/clients/add', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tag:CUR_CLI_TAG, name})});
   const d = await r.json();
   toast(d.ok ? d.msg : ('失败: '+d.err));
-  if(d.ok){ closeModal('modal-add'); refresh(); }
+  if(d.ok){ document.getElementById('cli-new-name').value=''; LAST_NODES_SIG=''; await refresh(); renderClientsModal(); }
+}
+async function delClientNow(idx){
+  if(!confirm('确认移除该子用户吗？移除后该设备将无法连接。')) return;
+  const r = await fetch('/api/nodes/clients/delete', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tag:CUR_CLI_TAG, index:idx})});
+  const d = await r.json();
+  toast(d.ok ? d.msg : ('失败: '+d.err));
+  if(d.ok){ LAST_NODES_SIG=''; await refresh(); renderClientsModal(); }
+}
+async function openSubModal(){
+  document.getElementById('modal-sub').classList.add('open');
+  const r = await fetch('/api/subscription');
+  const d = await r.json();
+  if(d.ok){
+    document.getElementById('sub-info').textContent = `已汇总 ${d.data.count} 个运行中节点（可直接导入 v2rayN / 小火箭 / Clash Verge）`;
+    document.getElementById('sub-b64').value = d.data.base64;
+    document.getElementById('sub-clash').value = d.data.clash_yaml;
+    window._SUB_RAW = d.data.raw_uris;
+  }
+}
+async function loadRawCfg(eng, btn){
+  CUR_RAW_ENG = eng || 'xray';
+  if(btn){
+    document.getElementById('ed-btn-xray').classList.remove('active');
+    document.getElementById('ed-btn-sb').classList.remove('active');
+    btn.classList.add('active');
+  }
+  const r = await fetch('/api/raw-config?engine='+CUR_RAW_ENG);
+  const d = await r.json();
+  if(d.ok) document.getElementById('raw-cfg-area').value = d.content;
+}
+async function saveRawCfg(){
+  if(!confirm(`确认校验并应用修改后的 ${CUR_RAW_ENG} 原始配置吗？`)) return;
+  const content = document.getElementById('raw-cfg-area').value;
+  await doPost('/api/raw-config', {engine:CUR_RAW_ENG, content});
 }
 async function openQr(title, uri){
   document.getElementById('qr-title').textContent = title;
@@ -655,17 +1195,101 @@ async function openQr(title, uri){
   const d = await r.json();
   document.getElementById('qr-content').innerHTML = d.svg || '生成失败';
 }
-async function selfCheck(tag){
-  const box = document.getElementById('check-res');
-  box.style.display = 'block';
-  box.innerHTML = '⏳ 正在通过本机 Reality 节点测试访问 Google...';
-  const r = await fetch('/api/self-check', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tag})});
-  const d = await r.json();
-  if(d.ok){
-    box.innerHTML = `✅ <b>节点 [${d.data.tag}] 正常</b> · Google 204 延迟 <b>${d.data.latency_ms} ms</b> · 出口 IP：<code>${d.data.outbound_ip}</code>`;
-  } else {
-    box.innerHTML = `❌ <b>自检失败</b> · HTTP ${d.data?d.data.http_code:'ERR'} ${d.err||''}`;
+let DIAG_ES = null;
+function closeDiagModal(){
+  if(DIAG_ES){ DIAG_ES.close(); DIAG_ES = null; }
+  closeModal('modal-check');
+}
+function selfCheck(tag){
+  if(DIAG_ES){ DIAG_ES.close(); DIAG_ES = null; }
+  const modal = document.getElementById('modal-check');
+  const body = document.getElementById('chk-body');
+  document.getElementById('chk-title').textContent = `节点五维体检 [${tag}]`;
+  const steps = [
+    {id:'sni', name:'1. 伪装目标 SNI 健康度 (TLS 1.3 + H2)'},
+    {id:'proxy', name:'2. Reality 端到端代理连通性 (Google 204)'},
+    {id:'outbound', name:'3. 实际出口 IP 与协议栈校验'},
+    {id:'cn_block', name:'4. 服务端国内流量拦截规则校验'},
+    {id:'gfw', name:'5. GFW 阻断检测 (中国大陆多城市 TCP 端口)'},
+  ];
+  body.innerHTML = `
+    <div class="diag-prog"><i id="diag-bar" style="width:6%"></i></div>
+    <div id="diag-gfw-banner" style="display:none"></div>
+    <div id="diag-steps">
+      ${steps.map(s=>`
+        <div class="diag-step" id="ds-${s.id}">
+          <div class="diag-left"><i class="step-dot" id="dd-${s.id}"></i><span>${s.name}</span></div>
+          <span class="sub" id="dv-${s.id}" style="margin:0;font-family:var(--mono)">等待中</span>
+        </div>`).join('')}
+    </div>
+    <div class="diag-log" id="diag-log"><div>[INIT] 正在建立实时检测流...</div></div>
+    <div class="btns" style="justify-content:flex-end;margin-top:12px">
+      <button class="btn info" id="diag-rerun" style="display:none" onclick="selfCheck('${tag}')">重新体检</button>
+      <button class="btn" onclick="closeDiagModal()">关闭</button>
+    </div>
+  `;
+  modal.classList.add('open');
+
+  let doneCount = 0;
+  function appendLog(msg){
+    const box = document.getElementById('diag-log'); if(!box) return;
+    const ts = new Date().toTimeString().slice(0,8);
+    const line = document.createElement('div');
+    line.textContent = `[${ts}] ${msg}`;
+    box.appendChild(line);
+    box.scrollTop = box.scrollHeight;
   }
+
+  DIAG_ES = new EventSource(`/api/self-check/stream?tag=${encodeURIComponent(tag)}`);
+  DIAG_ES.addEventListener('start', e=>{
+    const d = JSON.parse(e.data);
+    appendLog(`目标节点 ${d.tag} (${d.target}) · SNI=${d.sni}`);
+  });
+  DIAG_ES.addEventListener('step', e=>{
+    const d = JSON.parse(e.data);
+    const row = document.getElementById('ds-'+d.id);
+    const dot = document.getElementById('dd-'+d.id);
+    const val = document.getElementById('dv-'+d.id);
+    if(row){
+      row.className = 'diag-step ' + d.state;
+      if(d.state==='running'){ dot.textContent=''; val.textContent='检测中...'; }
+      else{
+        doneCount++;
+        document.getElementById('diag-bar').style.width = Math.min(100, Math.round(doneCount*20))+'%';
+        dot.textContent = d.state==='ok'?'✓':(d.state==='warn'?'!':'✕');
+        val.textContent = d.detail || d.state;
+        val.style.color = d.state==='ok'?'var(--green)':(d.state==='warn'?'var(--accent)':'var(--red)');
+      }
+    }
+    if(d.log) appendLog(d.log);
+  });
+  DIAG_ES.addEventListener('done', e=>{
+    const d = JSON.parse(e.data);
+    document.getElementById('diag-bar').style.width = '100%';
+    document.getElementById('diag-rerun').style.display = 'inline-flex';
+    const g = d.gfw || {};
+    const probesHtml = (g.cn_probes||[]).map(p=>`
+      <div class="probe-chip">
+        <span><b>${p.city}</b> <span style="color:var(--muted)">${p.network.slice(0,12)}</span></span>
+        <span style="color:${p.reached?'var(--green)':'var(--red)'};font-weight:600">${p.reached?(p.avg_ms+'ms'):'BLOCKED'}</span>
+      </div>`).join('');
+    const banner = document.getElementById('diag-gfw-banner');
+    banner.style.display = 'block';
+    banner.className = 'gfw-banner ' + (g.status||'unknown');
+    banner.innerHTML = `
+      <div><b>GFW 阻断检测结论</b> · <code>${g.target||''}</code></div>
+      <div style="margin-top:4px">${g.summary||'-'}</div>
+      ${probesHtml ? `<div class="diag-probes">${probesHtml}</div>` : ''}
+      ${(g.status==='blocked' && d.is_v6) ? `<div style="margin-top:10px"><button class="btn warn" onclick="closeDiagModal();doPost('/api/rotate-v6',{tag:'${d.tag}'},'确认立即从 /64 网段更换一个新的 IPv6 地址吗？')">立即一键换 IPv6 救急</button></div>` : ''}
+    `;
+    appendLog('全部 5 项检测已完成。');
+    if(DIAG_ES){ DIAG_ES.close(); DIAG_ES = null; }
+  });
+  DIAG_ES.addEventListener('error', ()=>{
+    if(DIAG_ES){ DIAG_ES.close(); DIAG_ES = null; }
+    const btn = document.getElementById('diag-rerun');
+    if(btn) btn.style.display = 'inline-flex';
+  });
 }
 async function saveRouting(){
   await doPost('/api/routing', {
@@ -674,6 +1298,105 @@ async function saveRouting(){
     block_private: document.getElementById('sw-priv').checked,
     outbound_strategy: document.getElementById('sel-strategy').value,
   });
+}
+function onS5ModeChange(){
+  document.getElementById('s5-domains-row').style.display = (document.getElementById('s5-mode').value==='all') ? 'none' : 'flex';
+}
+function parseSocks5Quick(){
+  let raw = (document.getElementById('s5-quick').value || '').trim().replace(/^socks5h?:\/\//i, '');
+  if(!raw){ toast('请先粘贴 SOCKS5 字符串'); return; }
+  let host='', port='1080', user='', pass='';
+  if(raw.includes('@')){
+    const [cred, hp] = raw.split('@');
+    const cp = cred.split(':'); user = decodeURIComponent(cp[0]||''); pass = decodeURIComponent(cp.slice(1).join(':')||'');
+    const hpp = hp.split(':'); host = hpp[0]||''; port = hpp[1]||'1080';
+  } else {
+    const parts = raw.split(':');
+    if(parts.length >= 4){ host = parts[0]; port = parts[1]; user = parts[2]; pass = parts.slice(3).join(':'); }
+    else if(parts.length === 2){ host = parts[0]; port = parts[1]; }
+    else { toast('格式未识别，支持 ip:port:user:pass 或 socks5://user:pass@ip:port'); return; }
+  }
+  document.getElementById('s5-host').value = host;
+  document.getElementById('s5-port').value = port;
+  document.getElementById('s5-user').value = user;
+  document.getElementById('s5-pass').value = pass;
+  toast('已自动解析填入');
+}
+async function testSocks5(){
+  const box = document.getElementById('s5-test-res');
+  box.style.display = 'block'; box.innerHTML = '正在测试 SOCKS5 连通性与落地 IP...';
+  const payload = {
+    host: document.getElementById('s5-host').value.trim(),
+    port: Number(document.getElementById('s5-port').value),
+    username: document.getElementById('s5-user').value.trim(),
+    password: document.getElementById('s5-pass').value.trim(),
+  };
+  try{
+    const r = await fetch('/api/socks5/test', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const d = await r.json();
+    box.innerHTML = d.ok
+      ? `<b>SOCKS5 连通正常</b> · 落地 IP <code>${d.data.ip}</code> · ${d.data.country} ${d.data.city} · ${d.data.org} · <b>${d.data.latency_ms} ms</b>`
+      : `<b>连接失败</b>：${d.err}`;
+  }catch(e){ box.innerHTML = '请求超时或异常'; }
+}
+async function saveSocks5(){
+  await doPost('/api/socks5/save', {
+    enabled: document.getElementById('s5-enabled').checked,
+    host: document.getElementById('s5-host').value.trim(),
+    port: Number(document.getElementById('s5-port').value),
+    username: document.getElementById('s5-user').value.trim(),
+    password: document.getElementById('s5-pass').value.trim(),
+    mode: document.getElementById('s5-mode').value,
+    custom_domains: document.getElementById('s5-domains').value.trim(),
+  });
+}
+async function loadXrayReleases(force){
+  if(XRAY_RELEASES_LOADED && !force) return;
+  const sel = document.getElementById('xray-ver-sel');
+  try{
+    const r = await fetch('/api/xray/releases' + (force?'?force=1':''));
+    const d = await r.json();
+    if(!d.ok){ toast('获取版本列表失败: '+(d.err||'')); return; }
+    document.getElementById('xray-cur-ver').textContent = d.current;
+    let opts = '<option value="latest">最新正式版 (latest)</option>';
+    (d.releases||[]).forEach(x=>{
+      opts += `<option value="${x.version}">v${x.version} (${x.date})${x.prerelease?' [Pre]':''}${x.version===d.current?' [当前]':''}</option>`;
+    });
+    sel.innerHTML = opts; XRAY_RELEASES_LOADED = true;
+    if(force) toast('已刷新 Xray 官方版本列表');
+  }catch(e){ toast('请求版本列表失败'); }
+}
+async function switchXrayVersion(){
+  const ver = document.getElementById('xray-ver-sel').value;
+  if(!confirm(`确认将 Xray 内核切换到 ${ver} 吗？\n切换前自动备份旧内核，若配置不兼容会自动回滚。`)) return;
+  const box = document.getElementById('xray-op-res');
+  box.style.display = 'block'; box.innerHTML = `正在下载并切换 Xray 内核至 <b>${ver}</b>，请稍候...`;
+  try{
+    const r = await fetch('/api/xray/switch-version', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:ver})});
+    const d = await r.json();
+    box.innerHTML = d.ok ? `<b>${d.msg}</b>` : `<b>切换失败</b>：${d.err}`;
+    toast(d.ok ? d.msg : '切换失败，已保持原版本');
+    if(d.ok){ loadXrayReleases(true); refresh(); }
+  }catch(e){ box.innerHTML = '请求超时或网络异常'; }
+}
+async function updateGeodata(){
+  const box = document.getElementById('xray-op-res');
+  box.style.display = 'block'; box.innerHTML = '正在更新 GeoIP / GeoSite 路由数据...';
+  const r = await fetch('/api/xray/update-geodata', {method:'POST'});
+  const d = await r.json();
+  box.innerHTML = d.ok ? `<b>${d.msg}</b>` : `<b>更新失败</b>：${d.err}`;
+  toast(d.ok ? d.msg : d.err);
+}
+async function installSingbox(){
+  const box = document.getElementById('sb-op-res');
+  box.style.display = 'block'; box.innerHTML = '正在从 GitHub 下载并安装最新官方 sing-box 内核，请稍候...';
+  try{
+    const r = await fetch('/api/singbox/install', {method:'POST'});
+    const d = await r.json();
+    box.innerHTML = d.ok ? `<b>${d.msg}</b>` : `<b>安装失败</b>：${d.err}`;
+    toast(d.ok ? d.msg : d.err);
+    if(d.ok) refresh();
+  }catch(e){ box.innerHTML = '请求超时或网络异常'; }
 }
 async function loadLogs(){
   const r = await fetch('/api/logs');
@@ -691,64 +1414,51 @@ function copyText(txt){
 async function changePassword(){
   const old_password = document.getElementById('pw-old').value;
   const new_password = document.getElementById('pw-new').value;
-  const new_password2 = document.getElementById('pw-new2').value;
-  if(new_password !== new_password2){ toast('两次输入的新密码不一致'); return; }
+  if(new_password !== document.getElementById('pw-new2').value){ toast('两次输入的新密码不一致'); return; }
   await doPost('/api/change-password', {old_password, new_password});
   document.getElementById('pw-old').value = '';
   document.getElementById('pw-new').value = '';
   document.getElementById('pw-new2').value = '';
 }
 
-let XRAY_RELEASES_LOADED = false;
-async function loadXrayReleases(force){
-  if(XRAY_RELEASES_LOADED && !force) return;
-  const sel = document.getElementById('xray-ver-sel');
-  try{
-    const r = await fetch('/api/xray/releases' + (force?'?force=1':''));
-    const d = await r.json();
-    if(!d.ok){ toast('获取版本列表失败: '+(d.err||'')); return; }
-    document.getElementById('xray-cur-ver').textContent = d.current;
-    let opts = '<option value="latest">最新正式版 (latest)</option>';
-    (d.releases||[]).forEach(x=>{
-      const curTag = x.version===d.current ? ' [当前]' : '';
-      const preTag = x.prerelease ? ' [Pre-release]' : '';
-      opts += `<option value="${x.version}">v${x.version} (${x.date})${preTag}${curTag}</option>`;
-    });
-    sel.innerHTML = opts;
-    XRAY_RELEASES_LOADED = true;
-    if(force) toast('已刷新 Xray 官方版本列表');
-  }catch(e){ toast('请求版本列表失败'); }
+/* Boot Splash & Interactive Spotlight */
+let BOOT_DONE = false;
+function finishBoot(){
+  if(BOOT_DONE) return;
+  BOOT_DONE = true;
+  const sp = document.getElementById('boot-splash');
+  if(sp) sp.classList.add('hide');
+  document.body.classList.remove('entering');
+  document.body.classList.add('entered');
+  setTimeout(()=>{ if(sp) sp.remove(); drawLiveChart(); drawDailyChart(); }, 520);
 }
-async function switchXrayVersion(){
-  const ver = document.getElementById('xray-ver-sel').value;
-  if(!confirm(`确认将 Xray 内核切换到 ${ver} 吗？\n切换前会自动备份旧内核，若配置不兼容会自动回滚。`)) return;
-  const box = document.getElementById('xray-op-res');
-  box.style.display = 'block';
-  box.innerHTML = `⏳ 正在下载并切换 Xray 内核至 <b>${ver}</b>，可能需要 15-40 秒，请勿关闭页面...`;
-  try{
-    const r = await fetch('/api/xray/switch-version', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version:ver})});
-    const d = await r.json();
-    if(d.ok){
-      box.innerHTML = `✅ <b>${d.msg}</b>`;
-      toast(d.msg);
-      loadXrayReleases(true); refresh();
-    } else {
-      box.innerHTML = `❌ <b>切换失败</b>：${d.err}`;
-      toast('切换失败，已保持原版本');
-    }
-  }catch(e){
-    box.innerHTML = '❌ 请求超时或网络异常';
+(function runBoot(){
+  const st = document.getElementById('boot-status');
+  setTimeout(()=>{ if(st) st.textContent = 'LINKING XRAY TELEMETRY...'; }, 280);
+  setTimeout(()=>{ if(st) st.textContent = 'SYSTEM READY · QUACKUI'; }, 600);
+  setTimeout(finishBoot, 860);
+})();
+document.addEventListener('mousemove', e=>{
+  const card = e.target.closest('.card, .node-card');
+  if(!card) return;
+  const rect = card.getBoundingClientRect();
+  card.style.setProperty('--mx', (e.clientX - rect.left) + 'px');
+  card.style.setProperty('--my', (e.clientY - rect.top) + 'px');
+});
+
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'){
+    closeModal('modal-add'); closeModal('modal-qr'); closeModal('modal-clients'); closeModal('modal-sub'); closeDiagModal();
   }
-}
-async function updateGeodata(){
-  const box = document.getElementById('xray-op-res');
-  box.style.display = 'block';
-  box.innerHTML = '⏳ 正在更新 GeoIP / GeoSite 路由数据...';
-  const r = await fetch('/api/xray/update-geodata', {method:'POST'});
-  const d = await r.json();
-  box.innerHTML = d.ok ? `✅ <b>${d.msg}</b>` : `❌ <b>更新失败</b>：${d.err}`;
-  toast(d.ok ? d.msg : d.err);
-}
+});
+document.querySelectorAll('.modal-bg').forEach(bg=>{
+  bg.addEventListener('click', e=>{
+    if(e.target===bg){
+      if(bg.id==='modal-check') closeDiagModal();
+      else bg.classList.remove('open');
+    }
+  });
+});
 
 window.addEventListener('resize', ()=>{ drawLiveChart(); drawDailyChart(); });
 refresh();

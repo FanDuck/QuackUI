@@ -21,6 +21,46 @@ if ! command -v xray >/dev/null 2>&1; then
   bash -c "$(curl -fsSL https://github.com/XTLS/Xray-install/raw/main/install-release.sh)" @ install >/dev/null
 fi
 
+# Initialize clean Xray config with local Stats API if missing or empty
+if [ ! -s /usr/local/etc/xray/config.json ] || ! grep -q '"StatsService"' /usr/local/etc/xray/config.json 2>/dev/null; then
+  echo "==> Initializing Xray base config with local Stats API (127.0.0.1:10085)..."
+  mkdir -p /usr/local/etc/xray
+  cat > /usr/local/etc/xray/config.json <<'XEOF'
+{
+  "log": { "loglevel": "warning", "access": "none" },
+  "stats": {},
+  "api": { "tag": "api", "services": ["StatsService"] },
+  "dns": {
+    "servers": ["https+local://1.1.1.1/dns-query", "https+local://8.8.8.8/dns-query", "localhost"],
+    "queryStrategy": "UseIPv4"
+  },
+  "policy": {
+    "levels": { "0": { "handshake": 4, "connIdle": 300, "uplinkOnly": 2, "downlinkOnly": 5, "statsUserUplink": true, "statsUserDownlink": true } },
+    "system": { "statsInboundUplink": true, "statsInboundDownlink": true }
+  },
+  "inbounds": [
+    { "tag": "api", "listen": "127.0.0.1", "port": 10085, "protocol": "dokodemo-door", "settings": { "address": "127.0.0.1" } }
+  ],
+  "outbounds": [
+    { "protocol": "freedom", "tag": "direct", "streamSettings": { "sockopt": { "domainStrategy": "UseIPv4" } } },
+    { "protocol": "blackhole", "tag": "block" }
+  ],
+  "routing": {
+    "domainStrategy": "IPIfNonMatch",
+    "rules": [
+      { "inboundTag": ["api"], "outboundTag": "api" },
+      { "ip": ["geoip:private"], "outboundTag": "block" },
+      { "protocol": ["bittorrent"], "outboundTag": "block" },
+      { "domain": ["geosite:cn"], "outboundTag": "block" },
+      { "ip": ["geoip:cn"], "outboundTag": "block" }
+    ]
+  }
+}
+XEOF
+  systemctl enable --now xray >/dev/null 2>&1 || true
+  systemctl restart xray >/dev/null 2>&1 || true
+fi
+
 echo "==> Setting up QuackUI in ${INSTALL_DIR}..."
 mkdir -p "${INSTALL_DIR}/web"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

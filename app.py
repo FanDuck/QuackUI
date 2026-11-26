@@ -5,6 +5,7 @@ Zero third-party Python dependencies. Pure Python 3 stdlib + SQLite3.
 Listens on 127.0.0.1 by default (accessed via SSH tunnel).
 """
 
+import base64
 import datetime
 import hashlib
 import hmac
@@ -25,11 +26,13 @@ from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import quote, unquote_plus
 
-VERSION = "2.0.1"
+VERSION = "2.3.5"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 WEB_DIR = os.path.join(BASE_DIR, "web")
 CFG_PATH = os.path.join(BASE_DIR, "config.json")
 DB_PATH = os.path.join(BASE_DIR, "quackui.db")
+SB_CFG = os.path.join(BASE_DIR, "singbox.json")
+CERT_DIR = os.path.join(BASE_DIR, "certs")
 XRAY_CFG = "/usr/local/etc/xray/config.json"
 NFT_CFG = "/etc/nftables.conf"
 NODE_INFO = "/root/node-info.txt"
@@ -90,9 +93,25 @@ def init_db():
                 remark TEXT NOT NULL DEFAULT '',
                 public_key TEXT NOT NULL DEFAULT '',
                 enabled INTEGER NOT NULL DEFAULT 1,
-                disabled_json TEXT NOT NULL DEFAULT ''
+                disabled_json TEXT NOT NULL DEFAULT '',
+                engine TEXT NOT NULL DEFAULT 'xray',
+                hop_range TEXT NOT NULL DEFAULT ''
+            );
+            CREATE TABLE IF NOT EXISTS kv_settings (
+                k TEXT PRIMARY KEY,
+                v TEXT NOT NULL DEFAULT ''
             );
         """)
+        # Migrate older v2.0/v2.1 DBs missing engine/hop_range columns
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(node_meta)").fetchall()}
+        if "engine" not in cols:
+            conn.execute("ALTER TABLE node_meta ADD COLUMN engine TEXT NOT NULL DEFAULT 'xray'")
+        if "hop_range" not in cols:
+            conn.execute("ALTER TABLE node_meta ADD COLUMN hop_range TEXT NOT NULL DEFAULT ''")
+        if "quota_gb" not in cols:
+            conn.execute("ALTER TABLE node_meta ADD COLUMN quota_gb REAL NOT NULL DEFAULT 0")
+        if "expire_date" not in cols:
+            conn.execute("ALTER TABLE node_meta ADD COLUMN expire_date TEXT NOT NULL DEFAULT ''")
     if os.path.exists(DB_PATH):
         os.chmod(DB_PATH, 0o600)
 
@@ -132,17 +151,19 @@ def read_xray_cfg():
 
 
 def save_xray_cfg(cfg):
-    tmp = XRAY_CFG + ".tmp"
+    tmp = "/usr/local/etc/xray/.config.tmp.json"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2, ensure_ascii=False)
-    code, _, err = run_cmd(["xray", "run", "-test", "-c", tmp])
+    code, out, err = run_cmd(["xray", "run", "-test", "-c", tmp])
     if code != 0:
         os.remove(tmp)
-        raise RuntimeError(f"Xray 配置校验失败: {err}")
+        detail = (err or out or "unknown error").splitlines()[-1]
+        raise RuntimeError(f"Xray 配置校验失败: {detail}")
     shutil.move(tmp, XRAY_CFG)
-    code, _, err = run_cmd(["systemctl", "restart", "xray"])
+    run_cmd(["systemctl", "reset-failed", "xray"], timeout=5)
+    code, out, err = run_cmd(["systemctl", "restart", "xray"])
     if code != 0:
-        raise RuntimeError(f"重启 Xray 失败: {err}")
+        raise RuntimeError(f"重启 Xray 失败: {err or out}")
 
 
 def detect_default_v6_iface_and_prefix():
@@ -192,31 +213,257 @@ def get_meta_map():
         return {r["tag"]: dict(r) for r in rows}
 
 
-def set_meta(tag, remark=None, public_key=None, enabled=None, disabled_json=None):
+def set_meta(tag, remark=None, public_key=None, enabled=None, disabled_json=None, engine=None, hop_range=None, quota_gb=None, expire_date=None):
     with DB_LOCK, db_conn() as conn:
         cur = conn.execute("SELECT * FROM node_meta WHERE tag=?", (tag,)).fetchone()
         if not cur:
             conn.execute(
-                "INSERT INTO node_meta(tag, remark, public_key, enabled, disabled_json) VALUES(?,?,?,?,?)",
+                "INSERT INTO node_meta(tag, remark, public_key, enabled, disabled_json, engine, hop_range, quota_gb, expire_date) VALUES(?,?,?,?,?,?,?,?,?)",
                 (
                     tag,
                     remark if remark is not None else tag,
                     public_key if public_key is not None else "",
                     1 if enabled is None else int(enabled),
                     disabled_json if disabled_json is not None else "",
+                    engine if engine is not None else "xray",
+                    hop_range if hop_range is not None else "",
+                    float(quota_gb) if quota_gb is not None else 0.0,
+                    expire_date if expire_date is not None else "",
                 ),
             )
         else:
             conn.execute(
-                "UPDATE node_meta SET remark=?, public_key=?, enabled=?, disabled_json=? WHERE tag=?",
+                "UPDATE node_meta SET remark=?, public_key=?, enabled=?, disabled_json=?, engine=?, hop_range=?, quota_gb=?, expire_date=? WHERE tag=?",
                 (
                     remark if remark is not None else cur["remark"],
                     public_key if public_key is not None else cur["public_key"],
                     int(enabled) if enabled is not None else cur["enabled"],
                     disabled_json if disabled_json is not None else cur["disabled_json"],
+                    engine if engine is not None else cur["engine"],
+                    hop_range if hop_range is not None else cur["hop_range"],
+                    float(quota_gb) if quota_gb is not None else float(cur["quota_gb"] or 0),
+                    expire_date if expire_date is not None else (cur["expire_date"] or ""),
                     tag,
                 ),
             )
+
+
+def get_singbox_version():
+    if not shutil.which("sing-box") and not os.path.exists("/usr/local/bin/sing-box"):
+        return ""
+    _, out, _ = run_cmd(["/usr/local/bin/sing-box", "version"], timeout=3)
+    if out:
+        parts = out.splitlines()[0].split()
+        if len(parts) >= 3:
+            return parts[2]
+    return ""
+
+
+def ensure_singbox_service():
+    unit = "/etc/systemd/system/quackui-singbox.service"
+    if not os.path.exists(unit):
+        with open(unit, "w", encoding="utf-8") as f:
+            f.write(
+                "[Unit]\n"
+                "Description=QuackUI sing-box Engine\n"
+                "After=network-online.target\n\n"
+                "[Service]\n"
+                "Type=simple\n"
+                f"ExecStart=/usr/local/bin/sing-box run -c {SB_CFG}\n"
+                "Restart=always\n"
+                "RestartSec=3\n\n"
+                "[Install]\n"
+                "WantedBy=multi-user.target\n"
+            )
+        run_cmd(["systemctl", "daemon-reload"], timeout=10)
+
+
+def install_or_upgrade_singbox():
+    import platform
+    m = platform.machine()
+    arch = "amd64" if m == "x86_64" else ("arm64" if m in ("aarch64", "arm64") else "")
+    if not arch:
+        raise RuntimeError(f"不支持的架构: {m}")
+    req = urllib.request.Request(
+        "https://api.github.com/repos/SagerNet/sing-box/releases/latest",
+        headers={"User-Agent": f"QuackUI/{VERSION}"},
+    )
+    with urllib.request.urlopen(req, timeout=12) as r:
+        ver = json.loads(r.read().decode("utf-8"))["tag_name"].lstrip("v")
+    url = f"https://github.com/SagerNet/sing-box/releases/download/v{ver}/sing-box-{ver}-linux-{arch}.tar.gz"
+    cmd = (
+        f'curl -fsSL "{url}" -o /tmp/sb_up.tar.gz && tar -xzf /tmp/sb_up.tar.gz -C /tmp && '
+        f'install -m 755 "/tmp/sing-box-{ver}-linux-{arch}/sing-box" /usr/local/bin/sing-box && '
+        f'rm -rf /tmp/sb_up.tar.gz "/tmp/sing-box-{ver}-linux-{arch}"'
+    )
+    code, _, err = run_cmd(["bash", "-c", cmd], timeout=120)
+    if code != 0:
+        raise RuntimeError(f"安装 sing-box 失败: {err[-180:]}")
+    ensure_singbox_service()
+    if os.path.exists(SB_CFG) and read_singbox_cfg().get("inbounds"):
+        run_cmd(["systemctl", "restart", "quackui-singbox"], timeout=10)
+    return get_singbox_version()
+
+
+def read_singbox_cfg():
+    if os.path.exists(SB_CFG):
+        try:
+            with open(SB_CFG, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {
+        "log": {"level": "warn"},
+        "dns": {"servers": [{"tag": "local", "type": "local"}], "strategy": "ipv4_only"},
+        "inbounds": [],
+        "outbounds": [{"type": "direct", "tag": "direct"}],
+        "route": {"default_domain_resolver": {"server": "local", "strategy": "ipv4_only"}},
+    }
+
+
+def save_singbox_cfg(cfg):
+    ensure_singbox_service()
+    if not cfg.get("inbounds"):
+        with open(SB_CFG, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2, ensure_ascii=False)
+        run_cmd(["systemctl", "disable", "--now", "quackui-singbox"], timeout=10)
+        return
+    if not os.path.exists("/usr/local/bin/sing-box"):
+        raise RuntimeError("请先在「内核与设置」中一键安装 sing-box 内核")
+    tmp = SB_CFG + ".tmp.json"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2, ensure_ascii=False)
+    code, out, err = run_cmd(["/usr/local/bin/sing-box", "check", "-c", tmp], timeout=10)
+    if code != 0:
+        os.remove(tmp)
+        raise RuntimeError(f"sing-box 配置校验失败: {(err or out)[-200:]}")
+    shutil.move(tmp, SB_CFG)
+    run_cmd(["systemctl", "reset-failed", "quackui-singbox"], timeout=5)
+    code, out, err = run_cmd(["systemctl", "enable", "--now", "quackui-singbox"], timeout=10)
+    code2, out2, err2 = run_cmd(["systemctl", "restart", "quackui-singbox"], timeout=10)
+    if code2 != 0:
+        raise RuntimeError(f"重启 sing-box 失败: {err2 or out2}")
+
+
+def ensure_self_signed_cert(tag, sni):
+    os.makedirs(CERT_DIR, exist_ok=True)
+    crt = os.path.join(CERT_DIR, f"{tag}.crt")
+    key = os.path.join(CERT_DIR, f"{tag}.key")
+    code, _, err = run_cmd([
+        "openssl", "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1",
+        "-nodes", "-days", "3650", "-subj", f"/CN={sni}",
+        "-addext", f"subjectAltName=DNS:{sni}", "-keyout", key, "-out", crt
+    ], timeout=10)
+    if code != 0:
+        raise RuntimeError(f"生成自签证书失败: {err}")
+    os.chmod(key, 0o600)
+    return crt, key
+
+
+def sync_nftables():
+    """Auto-sync nftables firewall rules to match all active Xray + sing-box nodes (always keeps SSH 22)."""
+    if not shutil.which("nft") or not os.path.exists(NFT_CFG):
+        return
+    xray_cfg = read_xray_cfg()
+    sb_cfg = read_singbox_cfg()
+    meta_map = get_meta_map()
+
+    tcp_v4, tcp_v6, tcp_any = set(), set(), set()
+    udp_v4, udp_v6, udp_any = set(), set(), set()
+    hy2_hops = []  # (family, hop_range, listen_port)
+
+    def add_port(listen, port, proto_kind, hop_range=""):
+        if listen in ("127.0.0.1", "::1") or str(listen).startswith("/"):
+            return
+        is_v6_only = ":" in str(listen) and str(listen) != "::"
+        is_v4_only = "." in str(listen) and str(listen) != "0.0.0.0"
+        if proto_kind in ("tcp", "both"):
+            if is_v6_only:
+                tcp_v6.add(port)
+            elif is_v4_only:
+                tcp_v4.add(port)
+            else:
+                tcp_any.add(port)
+        if proto_kind in ("udp", "both"):
+            if is_v6_only:
+                udp_v6.add(port)
+            elif is_v4_only:
+                udp_v4.add(port)
+            else:
+                udp_any.add(port)
+        if hop_range and re.match(r"^\d+-\d+$", hop_range):
+            fam = "ipv6" if is_v6_only else ("ipv4" if is_v4_only else "any")
+            hy2_hops.append((fam, hop_range, port))
+
+    for ib in xray_cfg.get("inbounds", []):
+        if ib.get("tag") == "api":
+            continue
+        pkind = "both" if ib.get("protocol") == "shadowsocks" else "tcp"
+        add_port(ib.get("listen", "0.0.0.0"), int(ib.get("port", 443)), pkind)
+
+    for ib in sb_cfg.get("inbounds", []):
+        tag = ib.get("tag", "")
+        t = ib.get("type", "")
+        pkind = "udp" if t in ("hysteria2", "tuic") else "tcp"
+        hop = meta_map.get(tag, {}).get("hop_range", "") if t == "hysteria2" else ""
+        add_port(ib.get("listen", "::"), int(ib.get("listen_port", 443)), pkind, hop)
+
+    lines = [
+        "#!/usr/sbin/nft -f",
+        "flush ruleset",
+        "table inet filter {",
+        "    chain input {",
+        "        type filter hook input priority 0; policy drop;",
+        "        ct state established,related accept",
+        "        ct state invalid drop",
+        "        iif lo accept",
+        "        ip protocol icmp accept",
+        "        ip6 nexthdr icmpv6 accept",
+        "        tcp dport 22 accept",
+    ]
+    if tcp_any:
+        lines.append(f"        tcp dport {{ {', '.join(str(p) for p in sorted(tcp_any))} }} accept")
+    if tcp_v4:
+        lines.append(f"        meta nfproto ipv4 tcp dport {{ {', '.join(str(p) for p in sorted(tcp_v4))} }} accept")
+    if tcp_v6:
+        lines.append(f"        meta nfproto ipv6 tcp dport {{ {', '.join(str(p) for p in sorted(tcp_v6))} }} accept")
+    if udp_any:
+        lines.append(f"        udp dport {{ {', '.join(str(p) for p in sorted(udp_any))} }} accept")
+    if udp_v4:
+        lines.append(f"        meta nfproto ipv4 udp dport {{ {', '.join(str(p) for p in sorted(udp_v4))} }} accept")
+    if udp_v6:
+        lines.append(f"        meta nfproto ipv6 udp dport {{ {', '.join(str(p) for p in sorted(udp_v6))} }} accept")
+    for fam, hr, _ in hy2_hops:
+        pref = "" if fam == "any" else f"meta nfproto {fam} "
+        lines.append(f"        {pref}udp dport {hr} accept")
+
+    lines += [
+        "    }",
+        "    chain forward { type filter hook forward priority 0; policy drop; }",
+        "    chain output  { type filter hook output priority 0; policy accept; }",
+        "}",
+    ]
+
+    if hy2_hops:
+        lines += [
+            "table inet hy2_hop {",
+            "    chain prerouting {",
+            "        type nat hook prerouting priority dstnat; policy accept;",
+        ]
+        for fam, hr, lp in hy2_hops:
+            pref = "" if fam == "any" else f"meta nfproto {fam} "
+            lines.append(f"        {pref}udp dport {hr} redirect to :{lp}")
+        lines += ["    }", "}"]
+
+    tmp = "/etc/nftables.conf.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    code, _, _ = run_cmd(["nft", "-c", "-f", tmp], timeout=5)
+    if code == 0:
+        shutil.move(tmp, NFT_CFG)
+        run_cmd(["nft", "-f", NFT_CFG], timeout=5)
+    else:
+        os.remove(tmp)
 
 
 def del_meta(tag):
@@ -291,10 +538,40 @@ def sample_xray_traffic():
                 )
 
 
+def enforce_node_limits():
+    """Auto-disable active nodes that exceed their traffic quota or expiration date."""
+    today = datetime.date.today().isoformat()
+    meta_map = get_meta_map()
+    if not meta_map:
+        return
+    tr = get_traffic_summary()["by_tag"]
+    for tag, meta in meta_map.items():
+        if not meta.get("enabled"):
+            continue
+        quota_gb = float(meta.get("quota_gb") or 0)
+        exp = (meta.get("expire_date") or "").strip()
+        exceeded = False
+        if quota_gb > 0:
+            used = tr.get(tag, {"up": 0, "down": 0})
+            if (used["up"] + used["down"]) >= quota_gb * (1024 ** 3):
+                exceeded = True
+        if exp and today > exp:
+            exceeded = True
+        if exceeded:
+            try:
+                toggle_node(tag)
+            except Exception:
+                pass
+
+
 def traffic_worker():
+    tick = 0
     while True:
         try:
             sample_xray_traffic()
+            tick += 1
+            if tick % 12 == 0:  # Every ~60s check quota & expiration limits
+                enforce_node_limits()
         except Exception:
             pass
         time.sleep(5)
@@ -359,82 +636,190 @@ def format_node_view(ib, meta, traffic_by_tag):
     listen = str(ib.get("listen", "0.0.0.0"))
     port = ib.get("port", 443)
     proto = ib.get("protocol", "vless")
-    clients = ib.get("settings", {}).get("clients", [{}])
+    settings = ib.get("settings", {})
+    clients = settings.get("clients", [{}])
     uuid = clients[0].get("id", "") if clients else ""
+    password = clients[0].get("password", "") if clients else ""
     flow = clients[0].get("flow", "") if clients else ""
+    ss_method = settings.get("method", "")
+    ss_pass = settings.get("password", "")
+
     ss = ib.get("streamSettings", {})
     net = ss.get("network", "raw")
     sec = ss.get("security", "none")
     rs = ss.get("realitySettings", {})
-    sni = (rs.get("serverNames") or [""])[0] if sec == "reality" else ""
-    sid = (rs.get("shortIds") or [""])[0] if sec == "reality" else ""
+    tls_s = ss.get("tlsSettings", {})
+    sni = ""
+    sid = ""
+    if sec == "reality":
+        sni = (rs.get("serverNames") or [""])[0]
+        sid = (rs.get("shortIds") or [""])[0]
+    elif sec == "tls":
+        sni = tls_s.get("serverName", "")
+
     path = ""
     if net == "xhttp":
         path = ss.get("xhttpSettings", {}).get("path", "/")
     elif net == "ws":
         path = ss.get("wsSettings", {}).get("path", "/")
+    elif net == "grpc":
+        path = ss.get("grpcSettings", {}).get("serviceName", "")
 
     remark = meta.get("remark") or tag
     pub = meta.get("public_key", "")
     enabled = bool(meta.get("enabled", 1))
     is_v6 = ":" in listen and listen != "::"
 
-    # Build shareable address
     addr = listen
-    if listen in ("0.0.0.0", "::", ""):
+    if listen in ("0.0.0.0", "::", "", "127.0.0.1"):
         addr = detect_public_ipv4()
     host_uri = f"[{addr}]" if ":" in addr and not addr.startswith("[") else addr
+    net_clash = "tcp" if net == "raw" else net
 
     uri = ""
     clash_yaml = ""
+
     if proto == "vless":
+        params = ["encryption=none"]
+        if flow and net == "raw" and sec == "reality":
+            params.append(f"flow={quote(flow)}")
+        params.append(f"security={sec}")
         if sec == "reality":
-            uri = (
-                f"vless://{uuid}@{host_uri}:{port}"
-                f"?encryption=none&flow={quote(flow)}&security=reality"
-                f"&sni={quote(sni)}&fp=chrome&pbk={quote(pub)}&sid={quote(sid)}&type=tcp#{quote(remark)}"
-            )
-            clash_yaml = (
-                f"- name: {remark}\n"
-                f"  type: vless\n"
-                f"  server: {addr}\n"
-                f"  port: {port}\n"
-                f"  uuid: {uuid}\n"
-                f"  network: tcp\n"
-                f"  tls: true\n"
-                f"  udp: true\n"
-                f"  flow: {flow}\n"
-                f"  servername: {sni}\n"
-                f"  client-fingerprint: chrome\n"
-                f"  reality-opts:\n"
-                f"    public-key: {pub}\n"
-                f"    short-id: {sid}"
-            )
-        elif net in ("xhttp", "ws"):
-            uri = (
-                f"vless://{uuid}@{host_uri}:{port}"
-                f"?encryption=none&security=tls&sni=YOUR_DOMAIN&fp=chrome&type={net}"
-                f"&host=YOUR_DOMAIN&path={quote(path)}#{quote(remark)}"
-            )
-            clash_yaml = (
-                f"- name: {remark}\n"
-                f"  type: vless\n"
-                f"  server: YOUR_DOMAIN\n"
-                f"  port: 443\n"
-                f"  uuid: {uuid}\n"
-                f"  network: {net}\n"
-                f"  tls: true\n"
-                f"  servername: YOUR_DOMAIN\n"
-                f"  client-fingerprint: chrome\n"
-                f"  {net}-opts:\n"
-                f"    path: {path}\n"
-                f"    headers:\n"
-                f"      Host: YOUR_DOMAIN"
-            )
+            params += [f"sni={quote(sni)}", "fp=chrome", f"pbk={quote(pub)}", f"sid={quote(sid)}"]
+        elif sec == "tls":
+            params += [f"sni={quote(sni or 'YOUR_DOMAIN')}", "fp=chrome"]
+        params.append(f"type={'tcp' if net == 'raw' else net}")
+        if net in ("ws", "xhttp"):
+            params.append(f"path={quote(path or '/')}")
+            if net == "xhttp":
+                params.append("mode=auto")
+            if sni:
+                params.append(f"host={quote(sni)}")
+        elif net == "grpc":
+            params.append(f"serviceName={quote(path)}")
+        uri = f"vless://{uuid}@{host_uri}:{port}?{'&'.join(params)}#{quote(remark)}"
+
+        lines = [
+            f"- name: {remark}",
+            "  type: vless",
+            f"  server: {addr}",
+            f"  port: {port}",
+            f"  uuid: {uuid}",
+            f"  network: {net_clash}",
+            "  udp: true",
+        ]
+        if sec in ("reality", "tls"):
+            lines += ["  tls: true", f"  servername: {sni or 'YOUR_DOMAIN'}", "  client-fingerprint: chrome"]
+            if flow and net == "raw":
+                lines.append(f"  flow: {flow}")
+        if sec == "reality":
+            lines += ["  reality-opts:", f"    public-key: {pub}", f"    short-id: {sid}"]
+        if net in ("ws", "xhttp"):
+            lines += [f"  {net}-opts:", f"    path: {path or '/'}"]
+        elif net == "grpc":
+            lines += ["  grpc-opts:", f"    grpc-service-name: {path}"]
+        clash_yaml = "\n".join(lines)
+
+    elif proto == "vmess":
+        vm_obj = {
+            "v": "2",
+            "ps": remark,
+            "add": addr,
+            "port": str(port),
+            "id": uuid,
+            "aid": "0",
+            "scy": "auto",
+            "net": "tcp" if net == "raw" else net,
+            "type": "none",
+            "host": sni,
+            "path": path,
+            "tls": "tls" if sec == "tls" else "",
+            "sni": sni if sec == "tls" else "",
+        }
+        b64 = base64.b64encode(json.dumps(vm_obj, separators=(",", ":")).encode("utf-8")).decode("ascii")
+        uri = f"vmess://{b64}"
+        lines = [
+            f"- name: {remark}",
+            "  type: vmess",
+            f"  server: {addr}",
+            f"  port: {port}",
+            f"  uuid: {uuid}",
+            "  alterId: 0",
+            "  cipher: auto",
+            f"  network: {net_clash}",
+            "  udp: true",
+        ]
+        if sec == "tls":
+            lines += ["  tls: true", f"  servername: {sni or 'YOUR_DOMAIN'}"]
+        if net == "ws":
+            lines += ["  ws-opts:", f"    path: {path or '/'}"]
+        elif net == "grpc":
+            lines += ["  grpc-opts:", f"    grpc-service-name: {path}"]
+        clash_yaml = "\n".join(lines)
+
+    elif proto == "trojan":
+        params = [f"security={sec}", f"type={'tcp' if net == 'raw' else net}"]
+        if sec == "reality":
+            params += [f"sni={quote(sni)}", "fp=chrome", f"pbk={quote(pub)}", f"sid={quote(sid)}"]
+        elif sec == "tls":
+            params += [f"sni={quote(sni or 'YOUR_DOMAIN')}", "fp=chrome"]
+        if net == "ws":
+            params.append(f"path={quote(path or '/')}")
+        elif net == "grpc":
+            params.append(f"serviceName={quote(path)}")
+        uri = f"trojan://{quote(password)}@{host_uri}:{port}?{'&'.join(params)}#{quote(remark)}"
+        lines = [
+            f"- name: {remark}",
+            "  type: trojan",
+            f"  server: {addr}",
+            f"  port: {port}",
+            f"  password: {password}",
+            f"  network: {net_clash}",
+            "  udp: true",
+        ]
+        if sec in ("reality", "tls"):
+            lines += [f"  sni: {sni or 'YOUR_DOMAIN'}", "  client-fingerprint: chrome"]
+        if sec == "reality":
+            lines += ["  reality-opts:", f"    public-key: {pub}", f"    short-id: {sid}"]
+        if net == "ws":
+            lines += ["  ws-opts:", f"    path: {path or '/'}"]
+        elif net == "grpc":
+            lines += ["  grpc-opts:", f"    grpc-service-name: {path}"]
+        clash_yaml = "\n".join(lines)
+
+    elif proto == "shadowsocks":
+        userinfo = base64.urlsafe_b64encode(f"{ss_method}:{ss_pass}".encode("utf-8")).decode("ascii").rstrip("=")
+        uri = f"ss://{userinfo}@{host_uri}:{port}#{quote(remark)}"
+        clash_yaml = "\n".join([
+            f"- name: {remark}",
+            "  type: ss",
+            f"  server: {addr}",
+            f"  port: {port}",
+            f"  cipher: {ss_method}",
+            f"  password: {ss_pass}",
+            "  udp: true",
+        ])
 
     tr = traffic_by_tag.get(tag, {"up": 0, "down": 0})
+    client_list = []
+    if proto in ("vless", "vmess"):
+        for idx, c in enumerate(clients):
+            cname = c.get("email") or f"user-{idx+1}"
+            cid = c.get("id", "")
+            c_uri = uri.replace(uuid, cid, 1) if (uri and uuid and cid) else uri
+            client_list.append({"name": cname, "id": cid, "uri": c_uri})
+    elif proto == "trojan":
+        for idx, c in enumerate(clients):
+            cname = c.get("email") or f"user-{idx+1}"
+            cpw = c.get("password", "")
+            c_uri = uri.replace(quote(password), quote(cpw), 1) if (uri and password and cpw) else uri
+            client_list.append({"name": cname, "id": cpw, "uri": c_uri})
+    else:
+        client_list.append({"name": "default", "id": ss_pass, "uri": uri})
+
     return {
         "tag": tag,
+        "engine": "xray",
         "remark": remark,
         "enabled": enabled,
         "protocol": proto,
@@ -443,15 +828,127 @@ def format_node_view(ib, meta, traffic_by_tag):
         "listen": listen,
         "port": port,
         "is_v6": is_v6,
-        "uuid": uuid,
+        "uuid": uuid or password or ss_pass,
+        "ss_method": ss_method,
         "flow": flow,
         "sni": sni,
         "pub": pub,
         "sid": sid,
         "path": path,
+        "hop_range": "",
+        "quota_gb": float(meta.get("quota_gb") or 0),
+        "expire_date": meta.get("expire_date") or "",
+        "clients": client_list,
         "uri": uri,
         "clash_yaml": clash_yaml,
         "traffic": tr,
+    }
+
+
+def format_singbox_node_view(ib, meta, traffic_by_tag):
+    tag = ib.get("tag", "sb-node")
+    proto = ib.get("type", "anytls")
+    listen = str(ib.get("listen", "::"))
+    port = int(ib.get("listen_port", 443))
+    users = ib.get("users") or [{}]
+    u0 = users[0] if users else {}
+    uuid = u0.get("uuid", "")
+    pw = u0.get("password", "")
+    sni = ib.get("tls", {}).get("server_name", "www.bing.com")
+    remark = meta.get("remark") or tag
+    enabled = bool(meta.get("enabled", 1))
+    hop_range = meta.get("hop_range", "")
+    is_v6 = ":" in listen and listen != "::"
+
+    addr = detect_public_ipv4() if listen in ("0.0.0.0", "::", "", "127.0.0.1") else listen
+    host_uri = f"[{addr}]" if ":" in addr and not addr.startswith("[") else addr
+
+    uri = ""
+    clash_yaml = ""
+    net = "udp" if proto in ("hysteria2", "tuic") else "tcp"
+    if proto == "anytls":
+        uri = f"anytls://{quote(pw)}@{host_uri}:{port}?sni={quote(sni)}&insecure=1#{quote(remark)}"
+        clash_yaml = "\n".join([
+            f"- name: {remark}",
+            "  type: anytls",
+            f"  server: {addr}",
+            f"  port: {port}",
+            f"  password: {pw}",
+            f"  sni: {sni}",
+            "  skip-cert-verify: true",
+            "  udp: true",
+        ])
+    elif proto == "hysteria2":
+        mport_q = f"&mport={quote(hop_range)}" if hop_range else ""
+        uri = f"hysteria2://{quote(pw)}@{host_uri}:{port}?sni={quote(sni)}{mport_q}&insecure=1#{quote(remark)}"
+        lines = [
+            f"- name: {remark}",
+            "  type: hysteria2",
+            f"  server: {addr}",
+            f"  port: {port}",
+            f"  password: {pw}",
+            f"  sni: {sni}",
+            "  skip-cert-verify: true",
+        ]
+        if hop_range:
+            lines.append(f"  ports: {hop_range}")
+        clash_yaml = "\n".join(lines)
+    elif proto == "tuic":
+        uri = f"tuic://{uuid}:{quote(pw)}@{host_uri}:{port}?sni={quote(sni)}&congestion_control=bbr&alpn=h3&allow_insecure=1#{quote(remark)}"
+        clash_yaml = "\n".join([
+            f"- name: {remark}",
+            "  type: tuic",
+            f"  server: {addr}",
+            f"  port: {port}",
+            f"  uuid: {uuid}",
+            f"  password: {pw}",
+            f"  sni: {sni}",
+            "  alpn: [h3]",
+            "  congestion-controller: bbr",
+            "  skip-cert-verify: true",
+            "  udp-relay-mode: native",
+        ])
+
+    client_list = []
+    for idx, u in enumerate(users):
+        uname = u.get("name") or f"user-{idx+1}"
+        upw = u.get("password", "")
+        uu = u.get("uuid", "")
+        c_uri = uri
+        if proto == "anytls":
+            c_uri = f"anytls://{quote(upw)}@{host_uri}:{port}?sni={quote(sni)}&insecure=1#{quote(remark + '-' + uname)}"
+        elif proto == "hysteria2":
+            mport_q = f"&mport={quote(hop_range)}" if hop_range else ""
+            c_uri = f"hysteria2://{quote(upw)}@{host_uri}:{port}?sni={quote(sni)}{mport_q}&insecure=1#{quote(remark + '-' + uname)}"
+        elif proto == "tuic":
+            c_uri = f"tuic://{uu}:{quote(upw)}@{host_uri}:{port}?sni={quote(sni)}&congestion_control=bbr&alpn=h3&allow_insecure=1#{quote(remark + '-' + uname)}"
+        client_list.append({"name": uname, "id": f"{uu} / {upw}" if (uu and upw) else upw, "uri": c_uri})
+
+    return {
+        "tag": tag,
+        "engine": "sing-box",
+        "remark": remark,
+        "enabled": enabled,
+        "protocol": proto,
+        "network": net,
+        "security": "tls",
+        "listen": listen,
+        "port": port,
+        "is_v6": is_v6,
+        "uuid": f"{uuid} / {pw}" if (uuid and pw) else (pw or uuid),
+        "ss_method": "",
+        "flow": "",
+        "sni": sni,
+        "pub": "",
+        "sid": "",
+        "path": "",
+        "hop_range": hop_range,
+        "quota_gb": float(meta.get("quota_gb") or 0),
+        "expire_date": meta.get("expire_date") or "",
+        "clients": client_list,
+        "uri": uri,
+        "clash_yaml": clash_yaml,
+        "traffic": traffic_by_tag.get(tag, {"up": 0, "down": 0}),
     }
 
 
@@ -464,19 +961,224 @@ def list_all_nodes(cfg, traffic_by_tag):
         if tag == "api":
             continue
         seen.add(tag)
-        meta = meta_map.get(tag, {"remark": tag, "public_key": "", "enabled": 1})
+        meta = dict(meta_map.get(tag, {"remark": tag, "public_key": "", "enabled": 1, "engine": "xray"}))
         meta["enabled"] = 1
         nodes.append(format_node_view(ib, meta, traffic_by_tag))
 
-    # Include disabled nodes stored in SQLite
+    sb_cfg = read_singbox_cfg()
+    for ib in sb_cfg.get("inbounds", []):
+        tag = ib.get("tag", "")
+        seen.add(tag)
+        meta = dict(meta_map.get(tag, {"remark": tag, "enabled": 1, "engine": "sing-box", "hop_range": ""}))
+        meta["enabled"] = 1
+        nodes.append(format_singbox_node_view(ib, meta, traffic_by_tag))
+
     for tag, meta in meta_map.items():
         if tag not in seen and not meta.get("enabled") and meta.get("disabled_json"):
             try:
                 ib = json.loads(meta["disabled_json"])
-                nodes.append(format_node_view(ib, meta, traffic_by_tag))
+                if meta.get("engine") == "sing-box":
+                    nodes.append(format_singbox_node_view(ib, meta, traffic_by_tag))
+                else:
+                    nodes.append(format_node_view(ib, meta, traffic_by_tag))
             except Exception:
                 pass
     return nodes
+
+
+AI_STREAM_DOMAINS = [
+    "domain:openai.com",
+    "domain:chatgpt.com",
+    "domain:oaistatic.com",
+    "domain:oaiusercontent.com",
+    "domain:anthropic.com",
+    "domain:claude.ai",
+    "domain:gemini.google.com",
+    "domain:aistudio.google.com",
+    "domain:generativelanguage.googleapis.com",
+    "domain:perplexity.ai",
+    "domain:netflix.com",
+    "domain:nflxvideo.net",
+    "domain:disneyplus.com",
+    "domain:tiktok.com",
+    "domain:tiktokv.com",
+    "domain:byteoversea.com",
+]
+
+
+def get_socks5_cfg():
+    default = {
+        "enabled": False,
+        "mode": "all",
+        "host": "",
+        "port": 1080,
+        "username": "",
+        "password": "",
+        "custom_domains": "",
+    }
+    with DB_LOCK, db_conn() as conn:
+        row = conn.execute("SELECT v FROM kv_settings WHERE k='socks5_outbound'").fetchone()
+    if row and row["v"]:
+        try:
+            default.update(json.loads(row["v"]))
+        except Exception:
+            pass
+    return default
+
+
+def set_socks5_cfg(s5):
+    with DB_LOCK, db_conn() as conn:
+        conn.execute(
+            "INSERT INTO kv_settings(k, v) VALUES('socks5_outbound', ?) ON CONFLICT(k) DO UPDATE SET v=excluded.v",
+            (json.dumps(s5, ensure_ascii=False),),
+        )
+
+
+def test_socks5_connectivity(host, port, username="", password=""):
+    host = (host or "").strip()
+    port = int(port or 0)
+    if not host or not (1 <= port <= 65535):
+        raise RuntimeError("请填写正确的 SOCKS5 地址和端口")
+    proxy_host = f"[{host}]" if ":" in host and not host.startswith("[") else host
+    proxy_url = f"socks5h://{proxy_host}:{port}"
+    cmd = ["curl", "-sS", "--max-time", "10", "-x", proxy_url]
+    if username or password:
+        cmd += ["--proxy-user", f"{username}:{password}"]
+    cmd += ["-w", "\n%{time_total}", "https://ipinfo.io/json"]
+    code, out, err = run_cmd(cmd, timeout=12)
+    if code != 0 or not out:
+        raise RuntimeError(f"SOCKS5 连接失败: {(err or '超时或认证错误')[-160:]}")
+    lines = out.splitlines()
+    latency_ms = 0
+    if len(lines) >= 2:
+        try:
+            latency_ms = int(float(lines[-1]) * 1000)
+            json_body = "\n".join(lines[:-1])
+        except Exception:
+            json_body = out
+    else:
+        json_body = out
+    info = json.loads(json_body)
+    return {
+        "ip": info.get("ip", "-"),
+        "country": info.get("country", "-"),
+        "region": info.get("region", ""),
+        "city": info.get("city", ""),
+        "org": info.get("org", "-"),
+        "latency_ms": latency_ms,
+    }
+
+
+def _apply_socks5_to_xray_cfg(cfg, s5):
+    """Sync socks5-out outbound and its routing rules into Xray config dict."""
+    outbounds = [ob for ob in cfg.get("outbounds", []) if ob.get("tag") != "socks5-out"]
+    rules = [r for r in cfg.get("routing", {}).get("rules", []) if r.get("outboundTag") != "socks5-out"]
+
+    if s5.get("enabled") and s5.get("host"):
+        server_obj = {"address": s5["host"], "port": int(s5["port"])}
+        if s5.get("username") or s5.get("password"):
+            server_obj["users"] = [{"user": s5.get("username", ""), "pass": s5.get("password", "")}]
+        outbounds.append({
+            "protocol": "socks",
+            "tag": "socks5-out",
+            "settings": {"servers": [server_obj]},
+        })
+
+        mode = s5.get("mode", "all")
+        custom_list = []
+        for raw_d in re.split(r"[\s,;]+", s5.get("custom_domains") or ""):
+            d = raw_d.strip().lower()
+            if d and "." in d:
+                custom_list.append(d if ":" in d else f"domain:{d}")
+
+        if mode == "all":
+            rules.append({"type": "field", "network": "tcp,udp", "outboundTag": "socks5-out"})
+        elif mode == "ai_stream":
+            domains = list(dict.fromkeys(AI_STREAM_DOMAINS + custom_list))
+            rules.append({"type": "field", "domain": domains, "outboundTag": "socks5-out"})
+        elif mode == "custom":
+            if not custom_list:
+                raise RuntimeError("自定义分流模式请至少填写一个域名")
+            rules.append({"type": "field", "domain": custom_list, "outboundTag": "socks5-out"})
+
+    cfg["outbounds"] = outbounds
+    cfg.setdefault("routing", {})["rules"] = rules
+
+
+def _apply_socks5_to_singbox_cfg(sb_cfg, s5):
+    """Sync residential SOCKS5 outbound and routing rules into sing-box config."""
+    outbounds = [ob for ob in sb_cfg.get("outbounds", []) if ob.get("tag") != "socks5-out"]
+    route = sb_cfg.setdefault("route", {})
+    rules = [r for r in route.get("rules", []) if r.get("outbound") != "socks5-out"]
+
+    if s5.get("enabled") and s5.get("host"):
+        ob = {"type": "socks", "tag": "socks5-out", "server": s5["host"], "server_port": int(s5["port"])}
+        if s5.get("username") or s5.get("password"):
+            ob["username"] = s5.get("username", "")
+            ob["password"] = s5.get("password", "")
+        outbounds.append(ob)
+
+        mode = s5.get("mode", "all")
+        custom_domains = []
+        for raw_d in re.split(r"[\s,;]+", s5.get("custom_domains") or ""):
+            d = raw_d.strip().lower().removeprefix("domain:")
+            if d and "." in d:
+                custom_domains.append(d)
+
+        if mode == "all":
+            route["final"] = "socks5-out"
+        else:
+            route["final"] = "direct"
+            if mode == "ai_stream":
+                base = [x.removeprefix("domain:") for x in AI_STREAM_DOMAINS]
+                domains = list(dict.fromkeys(base + custom_domains))
+            else:
+                domains = custom_domains
+            if domains:
+                rules.append({"domain_suffix": domains, "outbound": "socks5-out"})
+    else:
+        route["final"] = "direct"
+
+    sb_cfg["outbounds"] = outbounds
+    route["rules"] = rules
+
+
+def save_socks5_routing(payload):
+    enabled = bool(payload.get("enabled", False))
+    mode = payload.get("mode", "all")
+    if mode not in ("all", "ai_stream", "custom"):
+        raise RuntimeError("不支持的路由模式")
+    host = (payload.get("host") or "").strip()
+    port = int(payload.get("port") or 1080)
+    username = (payload.get("username") or "").strip()
+    password = (payload.get("password") or "").strip()
+    custom_domains = (payload.get("custom_domains") or "").strip()
+
+    if enabled:
+        if not host or not (1 <= port <= 65535):
+            raise RuntimeError("启用家宽路由需要填写有效的 SOCKS5 地址和端口")
+
+    s5 = {
+        "enabled": enabled,
+        "mode": mode,
+        "host": host,
+        "port": port,
+        "username": username,
+        "password": password,
+        "custom_domains": custom_domains,
+    }
+    cfg = read_xray_cfg()
+    _apply_socks5_to_xray_cfg(cfg, s5)
+    save_xray_cfg(cfg)
+
+    # Also sync to sing-box config so AnyTLS/Hy2/TUIC share the same residential exit
+    if os.path.exists(SB_CFG) or read_singbox_cfg().get("inbounds"):
+        sb_cfg = read_singbox_cfg()
+        _apply_socks5_to_singbox_cfg(sb_cfg, s5)
+        save_singbox_cfg(sb_cfg)
+
+    set_socks5_cfg(s5)
+    return s5
 
 
 def get_routing_state(cfg):
@@ -514,22 +1216,106 @@ def apply_routing_state(block_cn, block_bt, block_private, strategy):
     for ob in cfg.get("outbounds", []):
         if ob.get("tag") == "direct":
             ob.setdefault("streamSettings", {}).setdefault("sockopt", {})["domainStrategy"] = strategy
+    _apply_socks5_to_xray_cfg(cfg, get_socks5_cfg())
     save_xray_cfg(cfg)
 
 
 def add_node(payload):
     remark = (payload.get("remark") or "").strip()[:40]
-    mode = payload.get("mode", "reality")
-    listen_type = payload.get("listen_type", "ipv6")
-    port = int(payload.get("port", 443))
+    protocol = (payload.get("protocol") or payload.get("mode") or "vless").strip().lower()
+    transport = (payload.get("transport") or "raw").strip().lower()
+    security = (payload.get("security") or "reality").strip().lower()
+    listen_type = (payload.get("listen_type") or "ipv6").strip().lower()
+    port = int(payload.get("port") or 8443)
     if not (1 <= port <= 65535):
         raise RuntimeError("端口范围必须在 1-65535")
 
+    # Backward compatibility with v2.0.x mode names
+    if protocol == "reality":
+        protocol, transport, security = "vless", "raw", "reality"
+    elif protocol in ("xhttp", "ws"):
+        protocol, transport, security = "vless", protocol, "none"
+
+    if protocol in ("anytls", "hysteria2", "tuic"):
+        if not os.path.exists("/usr/local/bin/sing-box"):
+            raise RuntimeError("请先在「内核与设置」中点击一键安装 sing-box 内核")
+        sb_cfg = read_singbox_cfg()
+        existing_tags = {ib.get("tag") for ib in sb_cfg.get("inbounds", [])} | set(get_meta_map().keys())
+        tag = f"sb-{protocol[:3]}-{secrets.token_hex(2)}"
+        while tag in existing_tags:
+            tag = f"sb-{protocol[:3]}-{secrets.token_hex(2)}"
+
+        if listen_type == "ipv6":
+            _, _, _, v6_addr = detect_default_v6_iface_and_prefix()
+            listen = v6_addr
+        elif listen_type == "ipv4":
+            listen = "0.0.0.0"
+        elif listen_type == "dual":
+            listen = "::"
+        else:
+            listen = "127.0.0.1"
+
+        sni = (payload.get("sni") or "www.bing.com").strip().lower()
+        if not re.match(r"^[a-z0-9.-]{3,100}$", sni) or "." not in sni:
+            raise RuntimeError("SNI 域名格式不正确")
+        crt, key = ensure_self_signed_cert(tag, sni)
+        pw = secrets.token_urlsafe(16)
+        hop_range = (payload.get("hop_range") or "").strip()
+        if hop_range and not re.match(r"^\d+-\d+$", hop_range):
+            raise RuntimeError("端口跳跃范围格式应为 起始端口-结束端口，例如 20000-30000")
+
+        if protocol == "anytls":
+            ib = {
+                "type": "anytls", "tag": tag, "listen": listen, "listen_port": port,
+                "users": [{"name": "quack", "password": pw}],
+                "tls": {"enabled": True, "server_name": sni, "certificate_path": crt, "key_path": key},
+            }
+        elif protocol == "hysteria2":
+            ib = {
+                "type": "hysteria2", "tag": tag, "listen": listen, "listen_port": port,
+                "users": [{"name": "quack", "password": pw}],
+                "tls": {"enabled": True, "server_name": sni, "certificate_path": crt, "key_path": key},
+            }
+        else:  # tuic
+            _, uuid, _ = run_cmd(["xray", "uuid"])
+            uuid = uuid or str(secrets.token_hex(16))
+            ib = {
+                "type": "tuic", "tag": tag, "listen": listen, "listen_port": port,
+                "users": [{"name": "quack", "uuid": uuid, "password": pw}],
+                "congestion_control": "bbr",
+                "tls": {"enabled": True, "server_name": sni, "alpn": ["h3"], "certificate_path": crt, "key_path": key},
+            }
+        sb_cfg["inbounds"].append(ib)
+        _apply_socks5_to_singbox_cfg(sb_cfg, get_socks5_cfg())
+        save_singbox_cfg(sb_cfg)
+        set_meta(
+            tag,
+            remark=remark or f"QuackUI-{protocol.upper()}-{port}",
+            public_key="",
+            enabled=1,
+            disabled_json="",
+            engine="sing-box",
+            hop_range=hop_range if protocol == "hysteria2" else "",
+        )
+        sync_nftables()
+        return tag
+
+    if protocol not in ("vless", "vmess", "trojan", "shadowsocks"):
+        raise RuntimeError("不支持的协议")
+    if transport not in ("raw", "ws", "xhttp", "grpc"):
+        raise RuntimeError("不支持的传输方式，请选择 raw / ws / xhttp / grpc")
+    if security not in ("none", "reality", "tls"):
+        raise RuntimeError("不支持的安全层，请选择 none / reality / tls")
+    if protocol == "vmess" and security == "reality":
+        raise RuntimeError("VMess 不支持 Reality，请选择 None（配合反代/CDN）或切换协议为 VLESS")
+    if protocol == "shadowsocks":
+        transport, security = "raw", "none"
+
     cfg = read_xray_cfg()
     existing_tags = {ib.get("tag") for ib in cfg.get("inbounds", [])} | set(get_meta_map().keys())
-    tag = f"node-{secrets.token_hex(3)}"
+    tag = f"{protocol[:2]}-{secrets.token_hex(3)}"
     while tag in existing_tags:
-        tag = f"node-{secrets.token_hex(3)}"
+        tag = f"{protocol[:2]}-{secrets.token_hex(3)}"
 
     if listen_type == "ipv6":
         _, _, _, v6_addr = detect_default_v6_iface_and_prefix()
@@ -541,100 +1327,163 @@ def add_node(payload):
     else:
         listen = "127.0.0.1"
 
-    # Check port conflict on same listen
     for ib in cfg.get("inbounds", []):
         if ib.get("port") == port and ib.get("listen") in (listen, "::", "0.0.0.0"):
-            raise RuntimeError(f"端口 {port} 已被节点 {ib.get('tag')} 占用，请换一个端口")
-
-    code, uuid, err = run_cmd(["xray", "uuid"])
-    if code != 0 or not uuid:
-        raise RuntimeError(f"生成 UUID 失败: {err}")
+            raise RuntimeError(f"端口 {port} 已被节点 {ib.get('tag')} 占用，请更换端口")
 
     pub = ""
-    if mode == "reality":
+    if protocol in ("vless", "vmess"):
+        code, uuid, err = run_cmd(["xray", "uuid"])
+        if code != 0 or not uuid:
+            raise RuntimeError(f"生成 UUID 失败: {err}")
+        if protocol == "vless":
+            client = {"id": uuid}
+            if transport == "raw" and security == "reality":
+                client["flow"] = "xtls-rprx-vision"
+            settings = {"clients": [client], "decryption": "none"}
+        else:
+            settings = {"clients": [{"id": uuid}]}
+    elif protocol == "trojan":
+        pw = secrets.token_urlsafe(16)
+        settings = {"clients": [{"password": pw}]}
+    else:  # shadowsocks
+        method = (payload.get("ss_method") or "2022-blake3-aes-128-gcm").strip()
+        if method not in (
+            "2022-blake3-aes-128-gcm",
+            "2022-blake3-aes-256-gcm",
+            "aes-256-gcm",
+            "chacha20-ietf-poly1305",
+        ):
+            raise RuntimeError("不支持的 Shadowsocks 加密方式")
+        if method == "2022-blake3-aes-128-gcm":
+            ss_pw = base64.b64encode(secrets.token_bytes(16)).decode("ascii")
+        elif method == "2022-blake3-aes-256-gcm":
+            ss_pw = base64.b64encode(secrets.token_bytes(32)).decode("ascii")
+        else:
+            ss_pw = secrets.token_urlsafe(18)
+        settings = {"method": method, "password": ss_pw, "network": "tcp,udp"}
+
+    stream = {"network": transport}
+    if transport == "ws":
+        p = (payload.get("path") or f"/{secrets.token_hex(6)}").strip()
+        stream["wsSettings"] = {"path": p if p.startswith("/") else "/" + p}
+    elif transport == "xhttp":
+        p = (payload.get("path") or f"/{secrets.token_hex(6)}").strip()
+        stream["xhttpSettings"] = {"path": p if p.startswith("/") else "/" + p, "mode": "auto", "xPaddingBytes": "100-1000"}
+    elif transport == "grpc":
+        svc = (payload.get("path") or f"svc-{secrets.token_hex(4)}").strip().lstrip("/")
+        stream["grpcSettings"] = {"serviceName": svc}
+
+    if security == "reality":
         sni = (payload.get("sni") or "www.berkeley.edu").strip().lower()
         if not re.match(r"^[a-z0-9.-]{3,100}$", sni) or "." not in sni:
             raise RuntimeError("SNI 域名格式不正确")
         priv, pub = generate_x25519()
         sid = secrets.token_hex(8)
-        ib = {
-            "tag": tag,
-            "listen": listen,
-            "port": port,
-            "protocol": "vless",
-            "settings": {"clients": [{"id": uuid, "flow": "xtls-rprx-vision"}], "decryption": "none"},
-            "streamSettings": {
-                "network": "raw",
-                "security": "reality",
-                "realitySettings": {
-                    "show": False,
-                    "target": f"{sni}:443",
-                    "xver": 0,
-                    "serverNames": [sni],
-                    "privateKey": priv,
-                    "shortIds": [sid],
-                },
-            },
-            "sniffing": {"enabled": True, "destOverride": ["http", "tls", "quic"], "routeOnly": True},
+        stream["security"] = "reality"
+        stream["realitySettings"] = {
+            "show": False,
+            "target": f"{sni}:443",
+            "xver": 0,
+            "serverNames": [sni],
+            "privateKey": priv,
+            "shortIds": [sid],
         }
-    elif mode in ("xhttp", "ws"):
-        path = (payload.get("path") or f"/{secrets.token_hex(6)}").strip()
-        if not path.startswith("/"):
-            path = "/" + path
-        stream = {"network": mode}
-        if mode == "xhttp":
-            stream["xhttpSettings"] = {"path": path, "mode": "auto", "xPaddingBytes": "100-1000"}
-        else:
-            stream["wsSettings"] = {"path": path}
-        ib = {
-            "tag": tag,
-            "listen": listen,
-            "port": port,
-            "protocol": "vless",
-            "settings": {"clients": [{"id": uuid}], "decryption": "none"},
-            "streamSettings": stream,
-            "sniffing": {"enabled": True, "destOverride": ["http", "tls", "quic"], "routeOnly": True},
+    elif security == "tls":
+        sni = (payload.get("sni") or "").strip().lower()
+        cert_file = (payload.get("cert_file") or "/etc/nginx/cert/fullchain.pem").strip()
+        key_file = (payload.get("key_file") or "/etc/nginx/cert/key.pem").strip()
+        if not (os.path.exists(cert_file) and os.path.exists(key_file)):
+            raise RuntimeError(f"未找到 TLS 证书文件 ({cert_file})，若通过 Nginx/CDN 终结 TLS 请把安全层设为 None")
+        stream["security"] = "tls"
+        stream["tlsSettings"] = {
+            "serverName": sni,
+            "certificates": [{"certificateFile": cert_file, "keyFile": key_file}],
         }
     else:
-        raise RuntimeError("不支持的节点类型")
+        stream["security"] = "none"
+
+    ib = {
+        "tag": tag,
+        "listen": listen,
+        "port": port,
+        "protocol": protocol,
+        "settings": settings,
+        "streamSettings": stream,
+        "sniffing": {"enabled": True, "destOverride": ["http", "tls", "quic"], "routeOnly": True},
+    }
 
     cfg["inbounds"].append(ib)
     save_xray_cfg(cfg)
-    set_meta(tag, remark=remark or f"QuackUI-{mode}-{port}", public_key=pub, enabled=1, disabled_json="")
+    default_remark = f"QuackUI-{protocol.upper()}-{security if security != 'none' else transport}-{port}"
+    set_meta(tag, remark=remark or default_remark, public_key=pub, enabled=1, disabled_json="", engine="xray")
+    sync_nftables()
     return tag
 
 
 def toggle_node(tag):
-    cfg = read_xray_cfg()
     meta_map = get_meta_map()
+    meta = meta_map.get(tag, {})
+    if meta.get("engine") == "sing-box":
+        sb_cfg = read_singbox_cfg()
+        inbounds = sb_cfg.get("inbounds", [])
+        idx = next((i for i, ib in enumerate(inbounds) if ib.get("tag") == tag), None)
+        if idx is not None:
+            ib = inbounds.pop(idx)
+            save_singbox_cfg(sb_cfg)
+            set_meta(tag, enabled=0, disabled_json=json.dumps(ib, ensure_ascii=False))
+            sync_nftables()
+            return False
+        if not meta.get("disabled_json"):
+            raise RuntimeError("找不到该节点配置")
+        inbounds.append(json.loads(meta["disabled_json"]))
+        save_singbox_cfg(sb_cfg)
+        set_meta(tag, enabled=1, disabled_json="")
+        sync_nftables()
+        return True
+
+    cfg = read_xray_cfg()
     inbounds = cfg.get("inbounds", [])
     idx = next((i for i, ib in enumerate(inbounds) if ib.get("tag") == tag), None)
 
     if idx is not None:
-        # Disable it
         ib = inbounds.pop(idx)
         save_xray_cfg(cfg)
         set_meta(tag, enabled=0, disabled_json=json.dumps(ib, ensure_ascii=False))
+        sync_nftables()
         return False
     else:
-        # Enable it
-        meta = meta_map.get(tag)
         if not meta or not meta.get("disabled_json"):
             raise RuntimeError("找不到该节点的配置")
         ib = json.loads(meta["disabled_json"])
         inbounds.append(ib)
         save_xray_cfg(cfg)
         set_meta(tag, enabled=1, disabled_json="")
+        sync_nftables()
         return True
 
 
 def delete_node(tag):
     if tag == "api":
         raise RuntimeError("不能删除内部 API 入站")
+    meta = get_meta_map().get(tag, {})
+    if meta.get("engine") == "sing-box":
+        sb_cfg = read_singbox_cfg()
+        sb_cfg["inbounds"] = [ib for ib in sb_cfg.get("inbounds", []) if ib.get("tag") != tag]
+        save_singbox_cfg(sb_cfg)
+        for ext in (".crt", ".key"):
+            p = os.path.join(CERT_DIR, f"{tag}{ext}")
+            if os.path.exists(p):
+                os.remove(p)
+        del_meta(tag)
+        sync_nftables()
+        return
+
     cfg = read_xray_cfg()
     cfg["inbounds"] = [ib for ib in cfg.get("inbounds", []) if ib.get("tag") != tag]
     save_xray_cfg(cfg)
     del_meta(tag)
+    sync_nftables()
 
 
 def rotate_ipv6_for_node(tag):
@@ -653,23 +1502,37 @@ def rotate_ipv6_for_node(tag):
             f"    up ip -6 addr add {new_v6}/{plen} dev {iface} || true\n"
         )
 
-    cfg = read_xray_cfg()
-    ib = next((x for x in cfg.get("inbounds", []) if x.get("tag") == tag), None)
-    if not ib:
-        raise RuntimeError("未找到运行中的目标节点")
-    old_v6 = ib["listen"]
-    ib["listen"] = new_v6
-    save_xray_cfg(cfg)
+    meta = get_meta_map().get(tag, {})
+    old_v6 = ""
+    if meta.get("engine") == "sing-box":
+        sb_cfg = read_singbox_cfg()
+        ib = next((x for x in sb_cfg.get("inbounds", []) if x.get("tag") == tag), None)
+        if not ib:
+            raise RuntimeError("未找到运行中的 sing-box 节点")
+        old_v6 = ib.get("listen", "")
+        ib["listen"] = new_v6
+        save_singbox_cfg(sb_cfg)
+    else:
+        cfg = read_xray_cfg()
+        ib = next((x for x in cfg.get("inbounds", []) if x.get("tag") == tag), None)
+        if not ib:
+            raise RuntimeError("未找到运行中的 Xray 节点")
+        old_v6 = ib["listen"]
+        ib["listen"] = new_v6
+        save_xray_cfg(cfg)
 
+    all_listens = {x.get("listen") for x in read_xray_cfg().get("inbounds", [])} | {
+        x.get("listen") for x in read_singbox_cfg().get("inbounds", [])
+    }
     if old_v6 != base_addr and old_v6 != new_v6 and ":" in old_v6 and old_v6 != "::":
-        # Only delete old_v6 if no other inbound uses it
-        if not any(x.get("listen") == old_v6 for x in cfg.get("inbounds", [])):
+        if old_v6 not in all_listens:
             run_cmd(["ip", "-6", "addr", "del", f"{old_v6}/{plen}", "dev", iface])
 
     if tag == "reality-in":
         info = read_node_info()
         info["REALITY_V6"] = new_v6
         write_node_info(info)
+    sync_nftables()
     return new_v6
 
 
@@ -701,42 +1564,310 @@ def update_sni_for_node(tag, new_sni):
 
 
 def rotate_cred_for_node(tag):
-    code, new_uuid, err = run_cmd(["xray", "uuid"])
-    if code != 0 or not new_uuid:
-        raise RuntimeError(f"生成 UUID 失败: {err}")
-    new_sid = secrets.token_hex(8)
+    meta = get_meta_map().get(tag, {})
+    if meta.get("engine") == "sing-box":
+        sb_cfg = read_singbox_cfg()
+        ib = next((x for x in sb_cfg.get("inbounds", []) if x.get("tag") == tag), None)
+        if not ib:
+            raise RuntimeError("未找到运行中的 sing-box 节点")
+        new_pw = secrets.token_urlsafe(16)
+        ib["users"][0]["password"] = new_pw
+        if ib.get("type") == "tuic":
+            _, new_uuid, _ = run_cmd(["xray", "uuid"])
+            if new_uuid:
+                ib["users"][0]["uuid"] = new_uuid
+        save_singbox_cfg(sb_cfg)
+        return new_pw, ""
+
     cfg = read_xray_cfg()
     ib = next((x for x in cfg.get("inbounds", []) if x.get("tag") == tag), None)
     if not ib:
         raise RuntimeError("未找到运行中的目标节点")
-    ib["settings"]["clients"][0]["id"] = new_uuid
+    proto = ib.get("protocol", "vless")
+    new_sid = secrets.token_hex(8)
+    new_id = ""
+
+    if proto in ("vless", "vmess"):
+        code, new_uuid, err = run_cmd(["xray", "uuid"])
+        if code != 0 or not new_uuid:
+            raise RuntimeError(f"生成 UUID 失败: {err}")
+        ib["settings"]["clients"][0]["id"] = new_uuid
+        new_id = new_uuid
+    elif proto == "trojan":
+        new_id = secrets.token_urlsafe(16)
+        ib["settings"]["clients"][0]["password"] = new_id
+    elif proto == "shadowsocks":
+        method = ib["settings"].get("method", "")
+        if method == "2022-blake3-aes-128-gcm":
+            new_id = base64.b64encode(secrets.token_bytes(16)).decode("ascii")
+        elif method == "2022-blake3-aes-256-gcm":
+            new_id = base64.b64encode(secrets.token_bytes(32)).decode("ascii")
+        else:
+            new_id = secrets.token_urlsafe(18)
+        ib["settings"]["password"] = new_id
+
     if ib.get("streamSettings", {}).get("security") == "reality":
         ib["streamSettings"]["realitySettings"]["shortIds"] = [new_sid]
     save_xray_cfg(cfg)
 
     if tag == "reality-in":
         info = read_node_info()
-        info["REALITY_UUID"] = new_uuid
+        info["REALITY_UUID"] = new_id
         info["REALITY_SID"] = new_sid
         write_node_info(info)
-    return new_uuid, new_sid
+    return new_id, new_sid
 
 
-def self_check_node(tag="reality-in"):
+def rename_node(tag, new_remark):
+    new_remark = (new_remark or "").strip()[:40]
+    if not new_remark:
+        raise RuntimeError("备注名称不能为空")
+    set_meta(tag, remark=new_remark)
+    return new_remark
+
+
+def set_node_limits(tag, quota_gb, expire_date):
+    q = max(0.0, float(quota_gb or 0))
+    exp = (expire_date or "").strip()
+    if exp and not re.match(r"^\d{4}-\d{2}-\d{2}$", exp):
+        raise RuntimeError("到期日期格式应为 YYYY-MM-DD")
+    set_meta(tag, quota_gb=q, expire_date=exp)
+
+
+def reset_node_traffic(tag):
+    with DB_LOCK, db_conn() as conn:
+        conn.execute("DELETE FROM daily_traffic WHERE tag=?", (tag,))
+
+
+def add_node_client(tag, name):
+    name = re.sub(r"[^a-zA-Z0-9._-]", "", (name or "").strip())[:24] or f"dev-{secrets.token_hex(2)}"
+    meta = get_meta_map().get(tag, {})
+    if meta.get("engine") == "sing-box":
+        sb_cfg = read_singbox_cfg()
+        ib = next((x for x in sb_cfg.get("inbounds", []) if x.get("tag") == tag), None)
+        if not ib:
+            raise RuntimeError("未找到运行中的 sing-box 节点")
+        pw = secrets.token_urlsafe(14)
+        u = {"name": name, "password": pw}
+        if ib.get("type") == "tuic":
+            _, uuid, _ = run_cmd(["xray", "uuid"])
+            u["uuid"] = uuid or str(secrets.token_hex(16))
+        ib.setdefault("users", []).append(u)
+        save_singbox_cfg(sb_cfg)
+        return name
+
+    cfg = read_xray_cfg()
+    ib = next((x for x in cfg.get("inbounds", []) if x.get("tag") == tag), None)
+    if not ib:
+        raise RuntimeError("未找到运行中的 Xray 节点")
+    proto = ib.get("protocol", "vless")
+    if proto == "shadowsocks":
+        raise RuntimeError("Shadowsocks 单端口模式不支持多子用户，请新建节点")
+    clients = ib["settings"].setdefault("clients", [])
+    if proto in ("vless", "vmess"):
+        code, uuid, err = run_cmd(["xray", "uuid"])
+        if code != 0 or not uuid:
+            raise RuntimeError(f"生成 UUID 失败: {err}")
+        c = {"id": uuid, "email": name}
+        if proto == "vless" and ib.get("streamSettings", {}).get("network") == "raw" and ib.get("streamSettings", {}).get("security") == "reality":
+            c["flow"] = "xtls-rprx-vision"
+        clients.append(c)
+    elif proto == "trojan":
+        clients.append({"password": secrets.token_urlsafe(14), "email": name})
+    save_xray_cfg(cfg)
+    return name
+
+
+def del_node_client(tag, index):
+    idx = int(index)
+    meta = get_meta_map().get(tag, {})
+    if meta.get("engine") == "sing-box":
+        sb_cfg = read_singbox_cfg()
+        ib = next((x for x in sb_cfg.get("inbounds", []) if x.get("tag") == tag), None)
+        if not ib:
+            raise RuntimeError("未找到节点")
+        users = ib.get("users", [])
+        if len(users) <= 1:
+            raise RuntimeError("每个节点至少保留 1 个用户")
+        if not (0 <= idx < len(users)):
+            raise RuntimeError("用户索引无效")
+        users.pop(idx)
+        save_singbox_cfg(sb_cfg)
+        return
+
+    cfg = read_xray_cfg()
+    ib = next((x for x in cfg.get("inbounds", []) if x.get("tag") == tag), None)
+    if not ib:
+        raise RuntimeError("未找到节点")
+    clients = ib.get("settings", {}).get("clients", [])
+    if len(clients) <= 1:
+        raise RuntimeError("每个节点至少保留 1 个用户")
+    if not (0 <= idx < len(clients)):
+        raise RuntimeError("用户索引无效")
+    clients.pop(idx)
+    save_xray_cfg(cfg)
+
+
+def build_subscription_bundle():
+    cfg = read_xray_cfg()
+    tr = get_traffic_summary()
+    nodes = [n for n in list_all_nodes(cfg, tr["by_tag"]) if n["enabled"] and n.get("uri")]
+    uris = [n["uri"] for n in nodes]
+    b64 = base64.b64encode("\n".join(uris).encode("utf-8")).decode("ascii")
+    clash_proxies = "\n".join(n["clash_yaml"] for n in nodes if n.get("clash_yaml"))
+    clash_names = "\n".join(f"      - {n['remark']}" for n in nodes if n.get("clash_yaml"))
+    clash_full = (
+        "proxies:\n" + clash_proxies + "\n\n"
+        "proxy-groups:\n"
+        "  - name: QuackUI-Auto\n"
+        "    type: url-test\n"
+        "    url: https://www.gstatic.com/generate_204\n"
+        "    interval: 300\n"
+        "    proxies:\n" + clash_names + "\n"
+    )
+    return {"count": len(uris), "raw_uris": "\n".join(uris), "base64": b64, "clash_yaml": clash_full}
+
+
+def get_raw_config(engine):
+    if engine == "singbox":
+        return json.dumps(read_singbox_cfg(), indent=2, ensure_ascii=False)
+    return json.dumps(read_xray_cfg(), indent=2, ensure_ascii=False)
+
+
+def save_raw_config(engine, text):
+    try:
+        parsed = json.loads(text)
+    except Exception as e:
+        raise RuntimeError(f"JSON 语法错误: {e}")
+    if engine == "singbox":
+        save_singbox_cfg(parsed)
+    else:
+        save_xray_cfg(parsed)
+    sync_nftables()
+
+
+def gfw_tcp_probe(target_ip, port):
+    """Use Globalping open probe network to test TCP port reachability from China (CN) vs US."""
+    try:
+        target_norm = str(ipaddress.ip_address(target_ip))
+    except Exception:
+        return {"status": "unknown", "summary": "无效的目标 IP", "cn_probes": [], "us_probes": []}
+
+    body = json.dumps({
+        "type": "mtr",
+        "target": target_norm,
+        "locations": [{"country": "CN", "limit": 4}, {"country": "US", "limit": 2}],
+        "measurementOptions": {"protocol": "TCP", "port": int(port), "packets": 2},
+    }).encode("utf-8")
+    try:
+        req = urllib.request.Request(
+            "https://api.globalping.io/v1/measurements",
+            data=body,
+            headers={"Content-Type": "application/json", "User-Agent": f"QuackUI/{VERSION}"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as r:
+            mid = json.loads(r.read().decode("utf-8")).get("id")
+        if not mid:
+            return {"status": "unknown", "summary": "探针创建失败", "cn_probes": [], "us_probes": []}
+
+        res_data = None
+        for _ in range(14):
+            time.sleep(1.5)
+            with urllib.request.urlopen(f"https://api.globalping.io/v1/measurements/{mid}", timeout=10) as r:
+                d = json.loads(r.read().decode("utf-8"))
+            if d.get("status") == "finished":
+                res_data = d
+                break
+        if not res_data:
+            return {"status": "unknown", "summary": "探针响应超时", "cn_probes": [], "us_probes": []}
+
+        cn_probes, us_probes = [], []
+        for item in res_data.get("results", []):
+            pr = item.get("probe", {})
+            hops = item.get("result", {}).get("hops", [])
+            reached = False
+            avg_ms = None
+            for h in hops:
+                addr = h.get("resolvedAddress") or ""
+                try:
+                    if addr and str(ipaddress.ip_address(addr)) == target_norm and h.get("stats", {}).get("rcv", 0) > 0:
+                        reached = True
+                        avg_ms = round(float(h["stats"].get("avg", 0)), 1)
+                        break
+                except Exception:
+                    pass
+            entry = {
+                "city": pr.get("city") or pr.get("country") or "Unknown",
+                "network": (pr.get("network") or "")[:36],
+                "reached": reached,
+                "avg_ms": avg_ms,
+            }
+            if pr.get("country") == "CN":
+                cn_probes.append(entry)
+            else:
+                us_probes.append(entry)
+
+        cn_ok = sum(1 for x in cn_probes if x["reached"])
+        cn_tot = len(cn_probes)
+        if cn_tot == 0:
+            status, summary = "unknown", "暂无可用的中国大陆探针"
+        elif cn_ok == cn_tot:
+            status, summary = "ok", f"未检测到 GFW 阻断（中国大陆 {cn_ok}/{cn_tot} 节点 TCP:{port} 正常可达）"
+        elif cn_ok > 0:
+            status, summary = "warn", f"部分地区受限或丢包（中国大陆 {cn_ok}/{cn_tot} 节点 TCP:{port} 可达）"
+        else:
+            status, summary = "blocked", f"疑似被 GFW 阻断（中国大陆 0/{cn_tot} 节点可达 TCP:{port}，建议更换 IPv6 地址或端口）"
+
+        return {
+            "status": status,
+            "summary": summary,
+            "target": f"{target_norm}:{port}",
+            "cn_ok": cn_ok,
+            "cn_total": cn_tot,
+            "cn_probes": cn_probes,
+            "us_probes": us_probes,
+        }
+    except Exception as e:
+        return {"status": "unknown", "summary": f"探针暂不可用: {str(e)[:80]}", "cn_probes": [], "us_probes": []}
+
+
+def self_check_node(tag="reality-in", include_gfw=True):
+    """5-dimension node health check: proxy E2E, outbound IP, SNI health, CN block rule, GFW TCP probe."""
     cfg = read_xray_cfg()
     meta_map = get_meta_map()
     ib = next((x for x in cfg.get("inbounds", []) if x.get("tag") == tag), None)
     if not ib:
-        # fallback to first reality inbound
         ib = next((x for x in cfg.get("inbounds", []) if x.get("streamSettings", {}).get("security") == "reality"), None)
     if not ib:
         raise RuntimeError("没有可自检的 Reality 节点")
     tag = ib["tag"]
     rs = ib["streamSettings"]["realitySettings"]
+    sni = rs["serverNames"][0]
     pub = meta_map.get(tag, {}).get("public_key") or read_node_info().get("REALITY_PUB", "")
-    addr = ib["listen"]
-    if addr in ("0.0.0.0", "::", ""):
-        addr = "127.0.0.1"
+    listen = ib["listen"]
+    probe_ip = detect_public_ipv4() if listen in ("0.0.0.0", "::", "") else listen
+    local_addr = "127.0.0.1" if listen in ("0.0.0.0", "::", "") else listen
+
+    # 1. Start GFW probe in background thread while running local E2E checks in parallel
+    gfw_holder = {}
+    t_gfw = None
+    if include_gfw:
+        def _run_gfw():
+            gfw_holder["res"] = gfw_tcp_probe(probe_ip, ib["port"])
+        t_gfw = threading.Thread(target=_run_gfw, daemon=True)
+        t_gfw.start()
+
+    # 2. SNI health check (TLS 1.3 + HTTP/2)
+    sc, sout, _ = run_cmd([
+        "curl", "-sS", "--max-time", "5", "--tlsv1.3", "--http2",
+        "-o", "/dev/null", "-w", "%{http_code} %{time_appconnect}", f"https://{sni}/"
+    ], timeout=7)
+    s_parts = sout.split()
+    sni_code = s_parts[0] if s_parts else "000"
+    sni_ms = int(float(s_parts[1]) * 1000) if len(s_parts) > 1 else 0
+    sni_ok = sc == 0 and sni_code in ("200", "301", "302", "307", "308")
+
+    # 3. Local Xray E2E check: Google 204 + Outbound IP + CN block rule check
     tmp_cfg = "/tmp/quackui_selfcheck.json"
     client_cfg = {
         "log": {"loglevel": "warning"},
@@ -744,7 +1875,7 @@ def self_check_node(tag="reality-in"):
         "outbounds": [{
             "protocol": "vless",
             "settings": {"vnext": [{
-                "address": addr,
+                "address": local_addr,
                 "port": ib["port"],
                 "users": [{"id": ib["settings"]["clients"][0]["id"], "encryption": "none", "flow": "xtls-rprx-vision"}]
             }]},
@@ -752,7 +1883,7 @@ def self_check_node(tag="reality-in"):
                 "network": "raw",
                 "security": "reality",
                 "realitySettings": {
-                    "serverName": rs["serverNames"][0],
+                    "serverName": sni,
                     "fingerprint": "chrome",
                     "publicKey": pub,
                     "shortId": rs["shortIds"][0],
@@ -772,16 +1903,17 @@ def self_check_node(tag="reality-in"):
         _, ip_out, _ = run_cmd([
             "curl", "-s", "--max-time", "6", "-x", "socks5h://127.0.0.1:10899", "https://ifconfig.co"
         ], timeout=8)
+        _, cn_out, _ = run_cmd([
+            "curl", "-s", "--max-time", "4", "-x", "socks5h://127.0.0.1:10899",
+            "-o", "/dev/null", "-w", "%{http_code}", "https://www.baidu.com/"
+        ], timeout=6)
         parts = g_out.split()
         code_str = parts[0] if parts else "000"
         ms = int(float(parts[1]) * 1000) if len(parts) > 1 else 0
-        return {
-            "ok": c1 == 0 and code_str == "204",
-            "tag": tag,
-            "http_code": code_str,
-            "latency_ms": ms,
-            "outbound_ip": ip_out.strip() or "-",
-        }
+        proxy_ok = c1 == 0 and code_str == "204"
+        out_ip = ip_out.strip() or "-"
+        out_is_v4 = "." in out_ip and ":" not in out_ip
+        cn_blocked = cn_out.strip() in ("", "000")
     finally:
         p.terminate()
         try:
@@ -790,6 +1922,21 @@ def self_check_node(tag="reality-in"):
             p.kill()
         if os.path.exists(tmp_cfg):
             os.remove(tmp_cfg)
+
+    if t_gfw:
+        t_gfw.join(timeout=24)
+    gfw_res = gfw_holder.get("res", {"status": "unknown", "summary": "未执行 GFW 检测", "cn_probes": [], "us_probes": []})
+
+    return {
+        "ok": proxy_ok and gfw_res.get("status") != "blocked",
+        "tag": tag,
+        "proxy": {"ok": proxy_ok, "http_code": code_str, "latency_ms": ms},
+        "outbound": {"ip": out_ip, "is_v4": out_is_v4},
+        "sni": {"domain": sni, "ok": sni_ok, "http_code": sni_code, "handshake_ms": sni_ms},
+        "cn_block": {"blocked": cn_blocked, "http_code": cn_out.strip() or "000"},
+        "gfw": gfw_res,
+        "is_v6": ":" in probe_ip,
+    }
 
 
 def get_xray_version():
@@ -881,11 +2028,142 @@ def update_geodata():
     run_cmd(["systemctl", "restart", "xray"], timeout=15)
 
 
+def stream_self_check(tag, emit):
+    """Run 5-dimension health check step-by-step and emit SSE events in real time."""
+    cfg = read_xray_cfg()
+    meta_map = get_meta_map()
+    ib = next((x for x in cfg.get("inbounds", []) if x.get("tag") == tag), None)
+    if not ib:
+        ib = next((x for x in cfg.get("inbounds", []) if x.get("streamSettings", {}).get("security") == "reality"), None)
+    if not ib:
+        emit("error", {"err": "没有可自检的 Reality 节点"})
+        return
+
+    tag = ib["tag"]
+    rs = ib["streamSettings"]["realitySettings"]
+    sni = rs["serverNames"][0]
+    pub = meta_map.get(tag, {}).get("public_key") or read_node_info().get("REALITY_PUB", "")
+    listen = ib["listen"]
+    port = ib["port"]
+    probe_ip = detect_public_ipv4() if listen in ("0.0.0.0", "::", "") else listen
+    local_addr = "127.0.0.1" if listen in ("0.0.0.0", "::", "") else listen
+    is_v6 = ":" in probe_ip
+
+    emit("start", {"tag": tag, "target": f"{probe_ip}:{port}", "sni": sni, "is_v6": is_v6})
+
+    # Kick off Globalping GFW probe in background immediately so it runs concurrently
+    gfw_holder = {}
+    def _bg_gfw():
+        gfw_holder["res"] = gfw_tcp_probe(probe_ip, port)
+    t_gfw = threading.Thread(target=_bg_gfw, daemon=True)
+    t_gfw.start()
+
+    # Step 1: SNI health
+    emit("step", {"id": "sni", "state": "running", "log": f"[1/5] 正在检测伪装目标 {sni}:443 (TLS 1.3 + HTTP/2)..."})
+    sc, sout, _ = run_cmd([
+        "curl", "-sS", "--max-time", "5", "--tlsv1.3", "--http2",
+        "-o", "/dev/null", "-w", "%{http_code} %{time_appconnect}", f"https://{sni}/"
+    ], timeout=7)
+    s_parts = sout.split()
+    sni_code = s_parts[0] if s_parts else "000"
+    sni_ms = int(float(s_parts[1]) * 1000) if len(s_parts) > 1 else 0
+    sni_ok = sc == 0 and sni_code in ("200", "301", "302", "307", "308")
+    emit("step", {
+        "id": "sni", "state": "ok" if sni_ok else "fail",
+        "detail": f"TLS 1.3 + H2 · HTTP {sni_code} · {sni_ms} ms" if sni_ok else f"HTTP {sni_code}",
+        "log": f"[1/5] SNI {sni} -> {'通过' if sni_ok else '异常'} (HTTP {sni_code}, {sni_ms}ms)"
+    })
+
+    # Start temporary local Xray Reality client for steps 2, 3, 4
+    tmp_cfg = "/tmp/quackui_selfcheck_sse.json"
+    client_cfg = {
+        "log": {"loglevel": "warning"},
+        "inbounds": [{"listen": "127.0.0.1", "port": 10898, "protocol": "socks"}],
+        "outbounds": [{
+            "protocol": "vless",
+            "settings": {"vnext": [{
+                "address": local_addr, "port": port,
+                "users": [{"id": ib["settings"]["clients"][0]["id"], "encryption": "none", "flow": "xtls-rprx-vision"}]
+            }]},
+            "streamSettings": {
+                "network": "raw", "security": "reality",
+                "realitySettings": {"serverName": sni, "fingerprint": "chrome", "publicKey": pub, "shortId": rs["shortIds"][0]}
+            }
+        }]
+    }
+    with open(tmp_cfg, "w", encoding="utf-8") as f:
+        json.dump(client_cfg, f)
+    p = subprocess.Popen(["xray", "run", "-c", tmp_cfg], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    proxy_ok = False
+    try:
+        # Step 2: Reality E2E -> Google 204
+        emit("step", {"id": "proxy", "state": "running", "log": f"[2/5] 启动本机 Reality 客户端连接 {local_addr}:{port} -> 请求 Google 204..."})
+        time.sleep(1.3)
+        c1, g_out, _ = run_cmd([
+            "curl", "-s", "--max-time", "8", "-x", "socks5h://127.0.0.1:10898",
+            "-o", "/dev/null", "-w", "%{http_code} %{time_total}", "https://www.google.com/generate_204"
+        ], timeout=10)
+        parts = g_out.split()
+        code_str = parts[0] if parts else "000"
+        ms = int(float(parts[1]) * 1000) if len(parts) > 1 else 0
+        proxy_ok = c1 == 0 and code_str == "204"
+        emit("step", {
+            "id": "proxy", "state": "ok" if proxy_ok else "fail",
+            "detail": f"HTTP 204 · {ms} ms" if proxy_ok else f"HTTP {code_str}",
+            "log": f"[2/5] Reality 代理访问 Google -> {'通过' if proxy_ok else '失败'} (HTTP {code_str}, {ms}ms)"
+        })
+
+        # Step 3: Outbound IP check
+        emit("step", {"id": "outbound", "state": "running", "log": "[3/5] 正在通过代理查询实际出口 IP (ifconfig.co)..."})
+        _, ip_out, _ = run_cmd(["curl", "-s", "--max-time", "6", "-x", "socks5h://127.0.0.1:10898", "https://ifconfig.co"], timeout=8)
+        out_ip = ip_out.strip() or "-"
+        out_is_v4 = "." in out_ip and ":" not in out_ip
+        emit("step", {
+            "id": "outbound", "state": "ok" if out_ip != "-" else "fail",
+            "detail": f"{out_ip} ({'纯 IPv4' if out_is_v4 else 'IPv6/其他'})",
+            "log": f"[3/5] 实际出口 IP -> {out_ip} ({'IPv4' if out_is_v4 else 'Non-IPv4'})"
+        })
+
+        # Step 4: CN block rule check
+        emit("step", {"id": "cn_block", "state": "running", "log": "[4/5] 正在试连 www.baidu.com 校验服务端国内拦截规则..."})
+        _, cn_out, _ = run_cmd([
+            "curl", "-s", "--max-time", "4", "-x", "socks5h://127.0.0.1:10898",
+            "-o", "/dev/null", "-w", "%{http_code}", "https://www.baidu.com/"
+        ], timeout=6)
+        cn_blocked = cn_out.strip() in ("", "000")
+        emit("step", {
+            "id": "cn_block", "state": "ok" if cn_blocked else "warn",
+            "detail": "拦截生效 (000)" if cn_blocked else f"未拦截 (HTTP {cn_out.strip()})",
+            "log": f"[4/5] 国内分流拦截校验 -> {'已拦截 (安全)' if cn_blocked else '未拦截 (建议开启)'}"
+        })
+    finally:
+        p.terminate()
+        try:
+            p.wait(timeout=3)
+        except Exception:
+            p.kill()
+        if os.path.exists(tmp_cfg):
+            os.remove(tmp_cfg)
+
+    # Step 5: Wait for Globalping CN multi-city TCP port probe
+    emit("step", {"id": "gfw", "state": "running", "log": f"[5/5] 正在等待中国大陆多城市探针对 {probe_ip}:{port} 的 TCP 端口检测结果..."})
+    t_gfw.join(timeout=24)
+    gfw = gfw_holder.get("res", {"status": "unknown", "summary": "探针超时", "cn_probes": []})
+    g_state = "ok" if gfw.get("status") == "ok" else ("warn" if gfw.get("status") in ("warn", "unknown") else "fail")
+    emit("step", {
+        "id": "gfw", "state": g_state, "gfw": gfw,
+        "detail": gfw.get("summary", "-"),
+        "log": f"[5/5] GFW 阻断检测完成 -> {gfw.get('summary', '-')}"
+    })
+    emit("done", {"ok": proxy_ok and gfw.get("status") != "blocked", "tag": tag, "is_v6": is_v6, "gfw": gfw})
+
+
 def build_backup_tar_gz():
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as tar:
         for p, arc in [
             (XRAY_CFG, "xray-config.json"),
+            (SB_CFG, "singbox.json"),
             (NFT_CFG, "nftables.conf"),
             (NODE_INFO, "node-info.txt"),
             (DB_PATH, "quackui.db"),
@@ -893,6 +2171,8 @@ def build_backup_tar_gz():
         ]:
             if os.path.exists(p):
                 tar.add(p, arcname=arc)
+        if os.path.isdir(CERT_DIR):
+            tar.add(CERT_DIR, arcname="certs")
     return buf.getvalue()
 
 
@@ -915,6 +2195,12 @@ def get_system_stats():
     for s in ("xray", "nftables", "fail2ban"):
         _, o, _ = run_cmd(["systemctl", "is-active", s], timeout=3)
         svcs[s] = o or "unknown"
+    sb_ver = get_singbox_version()
+    if sb_ver:
+        _, sbo, _ = run_cmd(["systemctl", "is-active", "quackui-singbox"], timeout=3)
+        svcs["singbox"] = sbo or "inactive"
+    else:
+        svcs["singbox"] = "not-installed"
 
     f2b_cur = f2b_tot = 0
     _, f2b_out, _ = run_cmd(["fail2ban-client", "status", "sshd"], timeout=3)
@@ -928,10 +2214,30 @@ def get_system_stats():
     conns = len([l for l in ss_out.splitlines() if l.strip()])
     _, xray_ver, _ = run_cmd(["xray", "version"], timeout=3)
     xray_ver_short = xray_ver.splitlines()[0].split()[1] if xray_ver else "-"
+    _, bbr_out, _ = run_cmd(["sysctl", "-n", "net.ipv4.tcp_congestion_control"], timeout=2)
+    _, kern_out, _ = run_cmd(["uname", "-r"], timeout=2)
+    os_name = "Linux"
+    if os.path.exists("/etc/os-release"):
+        with open("/etc/os-release", "r", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("PRETTY_NAME="):
+                    os_name = line.split("=", 1)[1].strip().strip('"')
+                    break
+    pub_v4 = detect_public_ipv4()
+    try:
+        _, _, _, pub_v6 = detect_default_v6_iface_and_prefix()
+    except Exception:
+        pub_v6 = "-"
 
     return {
         "version": VERSION,
         "xray_version": xray_ver_short,
+        "singbox_version": sb_ver or "-",
+        "os": os_name,
+        "kernel": kern_out or "-",
+        "tcp_cc": bbr_out or "-",
+        "ipv4": pub_v4,
+        "ipv6": pub_v6,
         "load": [round(load1, 2), round(load5, 2), round(load15, 2)],
         "cpus": cpus,
         "mem_used": mem_used,
@@ -1018,12 +2324,14 @@ class Handler(BaseHTTPRequestHandler):
                 "traffic": traffic,
                 "nodes": list_all_nodes(cfg, traffic["by_tag"]),
                 "routing": get_routing_state(cfg),
+                "socks5": get_socks5_cfg(),
             })
         elif path == "/api/logs":
             _, xray_log, _ = run_cmd(["journalctl", "-u", "xray", "-n", "40", "--no-pager"], timeout=5)
+            _, sb_log, _ = run_cmd(["journalctl", "-u", "quackui-singbox", "-n", "40", "--no-pager"], timeout=5)
             _, f2b_log, _ = run_cmd(["fail2ban-client", "status", "sshd"], timeout=4)
             _, nft_log, _ = run_cmd(["nft", "list", "ruleset"], timeout=4)
-            self._send_json({"xray": xray_log, "fail2ban": f2b_log, "firewall": nft_log})
+            self._send_json({"xray": xray_log, "singbox": sb_log or "sing-box 未运行或暂无日志", "fail2ban": f2b_log, "firewall": nft_log})
         elif path == "/api/xray/releases":
             force = "force=1" in self.path
             try:
@@ -1036,6 +2344,34 @@ class Handler(BaseHTTPRequestHandler):
                 })
             except Exception as e:
                 self._send_json({"ok": False, "current": get_xray_version(), "err": str(e)}, 502)
+        elif path == "/api/self-check/stream":
+            from urllib.parse import parse_qs, urlparse
+            qs = parse_qs(urlparse(self.path).query)
+            tag = (qs.get("tag") or ["reality-in"])[0]
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("X-Accel-Buffering", "no")
+            self.end_headers()
+
+            def emit(ev, payload):
+                chunk = f"event: {ev}\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n".encode("utf-8")
+                self.wfile.write(chunk)
+                self.wfile.flush()
+
+            try:
+                stream_self_check(tag, emit)
+            except Exception as e:
+                try:
+                    emit("error", {"err": str(e)})
+                except Exception:
+                    pass
+        elif path == "/api/subscription":
+            self._send_json({"ok": True, "data": build_subscription_bundle()})
+        elif path == "/api/raw-config":
+            from urllib.parse import parse_qs, urlparse
+            eng = (parse_qs(urlparse(self.path).query).get("engine") or ["xray"])[0]
+            self._send_json({"ok": True, "engine": eng, "content": get_raw_config(eng)})
         elif path == "/api/backup":
             data = build_backup_tar_gz()
             fname = f"quackui-backup-{datetime.date.today().strftime('%Y%m%d')}.tar.gz"
@@ -1093,6 +2429,24 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/nodes/delete":
                 delete_node(data.get("tag", ""))
                 self._send_json({"ok": True, "msg": "节点已删除"})
+            elif path == "/api/nodes/rename":
+                nr = rename_node(data.get("tag", ""), data.get("remark", ""))
+                self._send_json({"ok": True, "msg": f"节点备注已更新为 {nr}"})
+            elif path == "/api/nodes/limits":
+                set_node_limits(data.get("tag", ""), data.get("quota_gb", 0), data.get("expire_date", ""))
+                self._send_json({"ok": True, "msg": "节点流量限额与到期时间已更新"})
+            elif path == "/api/nodes/reset-traffic":
+                reset_node_traffic(data.get("tag", ""))
+                self._send_json({"ok": True, "msg": "节点累计流量已清零"})
+            elif path == "/api/nodes/clients/add":
+                cname = add_node_client(data.get("tag", ""), data.get("name", ""))
+                self._send_json({"ok": True, "msg": f"已添加子用户 {cname}"})
+            elif path == "/api/nodes/clients/delete":
+                del_node_client(data.get("tag", ""), data.get("index", -1))
+                self._send_json({"ok": True, "msg": "已移除该子用户"})
+            elif path == "/api/raw-config":
+                save_raw_config(data.get("engine", "xray"), data.get("content", ""))
+                self._send_json({"ok": True, "msg": f"{data.get('engine', 'xray')} 配置校验通过并已生效"})
             elif path == "/api/rotate-v6":
                 nv6 = rotate_ipv6_for_node(data.get("tag", "reality-in"))
                 self._send_json({"ok": True, "msg": f"已切换到新 IPv6: {nv6}"})
@@ -1110,6 +2464,18 @@ class Handler(BaseHTTPRequestHandler):
                     data.get("outbound_strategy", "UseIPv4"),
                 )
                 self._send_json({"ok": True, "msg": "路由与出站策略已保存并生效"})
+            elif path == "/api/socks5/test":
+                res = test_socks5_connectivity(
+                    data.get("host", ""),
+                    data.get("port", 1080),
+                    data.get("username", ""),
+                    data.get("password", ""),
+                )
+                self._send_json({"ok": True, "data": res, "msg": f"SOCKS5 连通成功 · 出口 {res['ip']} ({res['country']} {res['city']})"})
+            elif path == "/api/socks5/save":
+                s5 = save_socks5_routing(data)
+                msg = f"家宽 SOCKS5 路由已启用 ({s5['host']}:{s5['port']})" if s5["enabled"] else "已关闭家宽 SOCKS5 路由，恢复 VPS 直出"
+                self._send_json({"ok": True, "data": s5, "msg": msg})
             elif path == "/api/restart-xray":
                 code, _, err = run_cmd(["systemctl", "restart", "xray"])
                 if code != 0:
@@ -1125,9 +2491,12 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/xray/update-geodata":
                 update_geodata()
                 self._send_json({"ok": True, "msg": "GeoIP / GeoSite 数据已更新并重启 Xray"})
+            elif path == "/api/singbox/install":
+                ver = install_or_upgrade_singbox()
+                self._send_json({"ok": True, "version": ver, "msg": f"sing-box v{ver} 已安装/更新就绪"})
             elif path == "/api/self-check":
-                res = self_check_node(data.get("tag", "reality-in"))
-                self._send_json({"ok": res["ok"], "data": res, "msg": "节点自检通过" if res["ok"] else "节点自检失败"})
+                res = self_check_node(data.get("tag", "reality-in"), include_gfw=bool(data.get("gfw", True)))
+                self._send_json({"ok": res["ok"], "data": res, "msg": "节点全面体检完成" if res["ok"] else "检测到异常项"})
             elif path == "/api/change-password":
                 old_pw = data.get("old_password", "")
                 new_pw = data.get("new_password", "")
